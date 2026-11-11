@@ -1,0 +1,73 @@
+name: CI
+
+# Pull requests are checked on their merge result (GitHub checks out
+# refs/pull/N/merge), so the checks run with the change merged in.
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    # Runs on the owner's Mac (the ci-runner skill, docs/decisions.md D-4).
+    # Setting the repository variable CI_RUNS_ON to "ubuntu-latest" moves it
+    # to GitHub's runners.
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "cfx-kit"]') }}
+    steps:
+      - run: echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          # The default (~/setup-pnpm) is shared by every job on a self-hosted machine.
+          dest: ${{ runner.temp }}/setup-pnpm
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .node-version
+          # On the Mac, the cache would archive the whole machine's pnpm store.
+          cache: ${{ runner.environment == 'github-hosted' && 'pnpm' || '' }}
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+
+  weeder:
+    # Judges a pull request's diff against the main line: deleted or weakened
+    # tests, stubs, swallowed errors, secrets and guardrail edits
+    # (docs/conventions.md, section 16). From jahala/weeder's
+    # examples/ci/github.yml. While the repository is private the findings are
+    # written as text, and the job fails when weeder blocks (exit 2) or cannot
+    # judge (exit 3). The SARIF upload to code scanning comes when the
+    # repository is public, where code scanning is free.
+    if: github.event_name == 'pull_request'
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "cfx-kit"]') }}
+    steps:
+      - run: echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # weeder diffs against the base branch, so the clone must carry it.
+          fetch-depth: 0
+      - name: Install weeder from its release
+        env:
+          WEEDER_VERSION: v0.5.0
+          RUNNER_PLATFORM: ${{ runner.os }}-${{ runner.arch }}
+        run: |
+          case "$RUNNER_PLATFORM" in
+            Linux-X64) target=x86_64-unknown-linux-musl ;;
+            Linux-ARM64) target=aarch64-unknown-linux-musl ;;
+            macOS-ARM64) target=aarch64-apple-darwin ;;
+            macOS-X64) target=x86_64-apple-darwin ;;
+            *) echo "no weeder release for $RUNNER_PLATFORM" >&2; exit 1 ;;
+          esac
+          asset="weeder-$target.tar.gz"
+          base="https://github.com/jahala/weeder/releases/download/$WEEDER_VERSION"
+          cd "$RUNNER_TEMP"
+          curl -fsSLO "$base/$asset" -O "$base/$asset.sha256"
+          # The archive is opened only once it is the one the release published.
+          shasum -a 256 -c "$asset.sha256"
+          mkdir -p weeder-bin
+          tar xzf "$asset" -C weeder-bin weeder
+          echo "$RUNNER_TEMP/weeder-bin" >> "$GITHUB_PATH"
+      # Without --format, weeder writes SARIF whenever stdout is not a terminal.
+      - run: weeder check --base origin/master --strict --format table

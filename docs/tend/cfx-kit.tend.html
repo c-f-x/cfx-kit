@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cfx-kit</title>
+<link rel="stylesheet" href="loop.css">
+<body>
+<noscript>This page renders its markdown payload with JavaScript. Without it, read the payload in the page source.</noscript>
+<script type="text/markdown" id="loop">
+# cfx-kit — the project loop
+**Goal.** Every c-f-x tool keeps the family's rules by running one shared command, `c-f-x check <name>`, and shares one ops runner and one set of Worker helpers, instead of copying guards and scripts that then drift apart. The rules live in `docs/conventions.md`; this map holds the bets that the kit's checks and its runner enforce them.
+
+## Tests
+- [ ] (human) the goal above states the real bet, not a placeholder
+- [x] (code) the c-f-x command answers its usage and refuses an unknown check · packages/kit/src/cli.test.ts @0afe4e4e3be88e · by cli
+
+## Children #checks #ops-runner
+## For #cfx-kit-persona
+## Tried
+- 2026-11-11 map initialized by tend init, then shaped by hand: the scaffolded skeleton page and its `scripts/smoke.sh` were removed, because smoke reads `garden.json` and c-f-x is not a garden bed. `pnpm check` stays the whole-suite gate; this map tracks the two bets the kit makes.
+</script>
+<script src="loop.js"></script>

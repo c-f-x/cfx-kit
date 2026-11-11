@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>checks · cfx-kit</title>
+<link rel="stylesheet" href="loop.css">
+<body>
+<noscript>This page renders its markdown payload with JavaScript. Without it, read the payload in the page source.</noscript>
+<script type="text/markdown" id="loop">
+# checks — the rule checks every tool runs
+**Goal.** Each family rule that `docs/conventions.md` says a check holds fails a tool repository that breaks it. Every check flags a sample it must flag and passes a clean one, and each of its rules was proven red once by a deliberate break in the check's code.
+
+## Tests
+- [x] (code) the ground rules flag each rule a tool repository breaks, one problem per break · packages/kit/src/checks/ground-rules.test.ts @d8509393b50999 · by cli
+- [x] (code) the layout check fails a sample that lacks the tool files and the ground-rule files, and passes a full one · packages/kit/src/checks/layout.test.ts @5b93f2b6f87569 · by cli
+- [x] (code) the names check finds research-only names and spares the vendors a tool lists · packages/kit/src/checks/names.test.ts @7ccab3dc72b20f · by cli
+- [x] (code) the docs check holds named paths, the AGENTS.md bound and the one-line CLAUDE.md · packages/kit/src/checks/docs.test.ts @83b756f3fd64bd · by cli
+- [x] (code) the architecture check flags each code-style rule on its sample · packages/kit/src/checks/architecture.test.ts @9f0bc06400957d · by cli
+
+## Needs #cfx-kit
+## For #cfx-kit-persona
+## Tried
+- 2026-11-11 shaped from the ground rules ruling (D-8). The AGENTS.md and CLAUDE.md rules sit in the docs check, which every repository runs, so a tool does not get the same problem twice from docs and layout.
+</script>
+<script src="loop.js"></script>

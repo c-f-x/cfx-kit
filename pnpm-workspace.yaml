@@ -1,0 +1,12 @@
+packages:
+  - packages/*
+
+# Supply-chain settings, in cfanalytics' form. A dependency's install script
+# runs only when allowBuilds approves it. The kit's Worker tests need two:
+# esbuild and workerd fetch their platform binaries at install. A version
+# younger than pnpm's minimum release age installs only when
+# minimumReleaseAgeExclude names it, and none does yet.
+allowBuilds:
+  esbuild: true
+  workerd: true
+minimumReleaseAgeExclude: []

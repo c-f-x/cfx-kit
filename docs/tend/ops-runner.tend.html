@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ops-runner · cfx-kit</title>
+<link rel="stylesheet" href="loop.css">
+<body>
+<noscript>This page renders its markdown payload with JavaScript. Without it, read the payload in the page source.</noscript>
+<script type="text/markdown" id="loop">
+# ops-runner — one command per operation, plan first
+**Goal.** Every tool operation (install, deploy, backup and the rest) runs through the kit's runner: it prints the plan and each step's undo before it changes anything, stops at the first failing step, and deploys only the bundle it checked.
+
+## Tests
+- [x] (code) an operation prints its plan first, refuses a step without an undo, and stops at the first failure · packages/kit/src/ops/operation.test.ts @3ea98a19946034 · by cli
+- [x] (code) the step runner stops at its first failing step and names it · packages/kit/src/ops/run-steps.test.ts @402bb991ed5eee · by cli
+- [x] (code) a deploy ships only the bundle it checked · packages/kit/src/ops/bundle.test.ts @67105620deaeaf · by cli
+- [x] (code) the health wait gives up at its deadline and names the parts that failed · packages/kit/src/ops/health.test.ts @9fc6bbfcc2b075 · by cli
+
+## Needs #cfx-kit
+## For #cfx-kit-persona
+## Tried
+- 2026-11-11 shaped from conventions section 3. No tool's deploy runs through the runner yet; cfx-status is its first consumer.
+</script>
+<script src="loop.js"></script>
