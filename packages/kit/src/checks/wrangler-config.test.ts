@@ -7,6 +7,7 @@ import { initRepo } from "../test-support/git.ts";
 import {
   deploymentValueViolations,
   literalJurisdictionViolations,
+  requiredSecretViolations,
   secretNamesOf,
   secretViolations,
 } from "./wrangler-config.ts";
@@ -95,6 +96,28 @@ test("the jurisdiction check flags a jurisdiction written into the config, in an
   ]);
 });
 
+test("every block declares secrets.required, naming exactly the secrets of .dev.vars.example", () => {
+  const found = requiredSecretViolations(
+    {
+      secrets: { required: ["AUTH_SECRET", "OLD_KEY"] },
+      env: {
+        // Wrangler does not inherit secrets from the top level.
+        prod: {},
+        demo: { secrets: { required: ["AUTH_SECRET", "SESSION_KEY"] } },
+        bare: { secrets: { required: "AUTH_SECRET" } },
+      },
+    },
+    ["AUTH_SECRET", "SESSION_KEY"],
+  );
+  assert.deepEqual(found, [
+    "top level: secrets.required names OLD_KEY, which .dev.vars.example does not",
+    "top level: .dev.vars.example names SESSION_KEY, which secrets.required does not",
+    "env.prod declares no secrets.required: list the Worker's secrets there, [] when it has none; Wrangler does not inherit it from the top level",
+    "env.bare declares no secrets.required: list the Worker's secrets there, [] when it has none; Wrangler does not inherit it from the top level",
+  ]);
+  assert.deepEqual(requiredSecretViolations({ secrets: { required: [] } }, []), []);
+});
+
 const CLEAN_WRANGLER = `{
   // The template: deployment values come from the site file.
   "name": "cfx-sample",
@@ -131,8 +154,9 @@ test("c-f-x check wrangler-config fails on a sample with deployment values, a se
   assert.match(stderr, /wrangler\.jsonc: vars\.AUTH_SECRET holds a secret/);
   assert.match(stderr, /wrangler\.jsonc: vars\.AUTH_SECRET names the secret AUTH_SECRET/);
   assert.match(stderr, /wrangler\.jsonc: r2_buckets\[0\]\.jurisdiction hard-codes a jurisdiction/);
+  assert.match(stderr, /wrangler\.jsonc: top level declares no secrets\.required/);
   assert.match(stderr, /\.dev\.vars is not ignored by git/);
-  assert.match(stderr, /check wrangler-config: failed with 7 problems/);
+  assert.match(stderr, /check wrangler-config: failed with 8 problems/);
 });
 
 test("c-f-x check wrangler-config passes a template with only example values", async () => {

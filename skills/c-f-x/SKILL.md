@@ -1,6 +1,6 @@
 ---
 name: c-f-x
-description: Use when working in a c-f-x tool repository (a cfx-<job> tool on Cloudflare) that depends on @c-f-x/kit. Covers running the family's rule checks with `c-f-x check <name>` and fixing what they flag, defining an operation for `pnpm ops <tool> <command>` with a plan and an undo per step, using the Worker helpers (health handler and contract test, job, notify, keys), and loading the private site file. Also says what needs the owner.
+description: Use when working in a c-f-x tool repository (a cfx-<job> tool on Cloudflare) that depends on @c-f-x/kit. Covers starting a new tool from the kit's templates, running the family's rule checks with `c-f-x check <name>` and fixing what they flag, defining an operation for `pnpm ops <tool> <command>` with a plan and an undo per step, using the Worker helpers (health handler and contract test, job, notify, keys), and loading the private site file. Also says what needs the owner.
 ---
 
 # c-f-x: the kit every tool uses
@@ -8,6 +8,18 @@ description: Use when working in a c-f-x tool repository (a cfx-<job> tool on Cl
 `@c-f-x/kit` holds the rules the c-f-x tools share and the code that keeps them. A tool installs it at a pinned version. The rules themselves are in the kit's `docs/conventions.md`. Read the section a check names before you change code to satisfy it: a check holds a rule, and the rule is what matters.
 
 The package is not on npm yet. Until it is, a tool cannot install it, and only the kit's own repository runs this code.
+
+## Start a new tool from the templates
+
+The kit's `templates/tool/` holds the files a new tool copies: `README.md`, `AGENTS.md` with its install guide, `CLAUDE.md`, `CONTRIBUTING.md`, `.dev.vars.example`, `skills/cfx-example/SKILL.md` and `.github/ISSUE_TEMPLATE/`. A tool made from them passes the checks.
+
+1. Copy them from a shallow clone in a temp folder: `git clone --depth 1 https://github.com/c-f-x/cfx-kit "$TMPDIR/cfx-kit"`, then `cp -R "$TMPDIR/cfx-kit/templates/tool/." .` in the new tool's folder.
+2. Replace the name everywhere: rename `skills/cfx-example` to `skills/<tool>`, and replace `cfx-example` with the tool's name in every copied file.
+3. Copy `LICENSE`, `SECURITY.md`, `.github/dependabot.yml` and `.github/FUNDING.yml` from the kit's root. They are the same in every repository.
+4. Rewrite each sentence that says what to write, in the tool's own words. Keep every heading, its order and the install guide's parts. Each secret the tool's `wrangler.jsonc` lists in `secrets.required` gets a line in `.dev.vars.example` and a piped line under `### Secrets`.
+5. Run `c-f-x check layout`, `c-f-x check docs` and `c-f-x check wrangler-config`, and fix what they flag.
+
+The README needs a real screenshot of the main screen with made-up data, light and dark, in `docs/images/`. A tool without a screen shows real terminal output in a `console` block instead. Whether the screenshot looks right is the owner's call. Do not offer Cloudflare's deploy button: `docs/conventions.md` section 11 says when it may be.
 
 ## The checks
 
@@ -17,11 +29,11 @@ Run each from the tool repository's own folder. Exit 0 passes, 1 fails with one 
 |---|---|
 | `c-f-x check docs` | a doc names a path that does not exist, `AGENTS.md` is missing, longer than 150 lines or has no `## Test strategy`, or `CLAUDE.md` holds anything but `@AGENTS.md` |
 | `c-f-x check names` | a tracked file names a vendor known only from research |
-| `c-f-x check layout` | a file every tool keeps is missing, no test runs the health contract, or a ground rule is broken: the skill, the three ways to install, the public files, the weeder and petals jobs, the tend map, the landing page |
+| `c-f-x check layout` | a file every tool keeps is missing, no test runs the health contract, or a ground rule is broken: the README's order, the install guide in `AGENTS.md`, the skill, the public files, the weeder and petals jobs, the tend map, the landing page |
 | `c-f-x check architecture` | `core/` does I/O, slices reach into each other, module state, mail sent outside one `mail.ts`, scheduled work outside `job`, a jurisdiction written into the code |
 | `c-f-x check lifetimes` | a binding or table in `wrangler.jsonc` or the migrations has no row in `docs/data-model.md` |
 | `c-f-x check migrations` | an applied schema step changed. `c-f-x lock-migrations` locks new steps. |
-| `c-f-x check wrangler-config` | `wrangler.jsonc` holds an id, a real hostname, an email address, a secret or a jurisdiction. Where data is stored is the site file's `jurisdiction`. |
+| `c-f-x check wrangler-config` | `wrangler.jsonc` holds an id, a real hostname, an email address, a secret or a jurisdiction, or a block's `secrets.required` differs from `.dev.vars.example`. Where data is stored is the site file's `jurisdiction`. |
 | `c-f-x check run-scope` | `pnpm test` leaves a file, a repository file or a process behind |
 
 `c-f-x.json` at the tool's root tells the checks where its code is: `{ "sources": ["src"], "slices": ["src/features"], "migrations": ["migrations"] }`. Add `"vendors": [...]` for the vendors the tool integrates, whose names its public text may use. Never add a name to `vendors` to silence `names` when the tool does not use that vendor's code or SDK; reword the text instead.

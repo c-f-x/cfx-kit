@@ -1,11 +1,13 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { isRecord, readWrangler, WRANGLER, type Wrangler } from "./tool-config.ts";
+import { configBlocks, isRecord, readWrangler, WRANGLER, type Wrangler } from "./tool-config.ts";
 import type { Check } from "./types.ts";
 
 // `c-f-x check wrangler-config`: the template `wrangler.jsonc` in a public
-// repository holds no deployment value, no secret and no jurisdiction.
+// repository holds no deployment value, no secret and no jurisdiction, and
+// every block lists the Worker's secrets in `secrets.required`, as
+// `.dev.vars.example` does.
 // Deployment values, where data is stored among them, live in the private site
 // file (docs/conventions.md, sections 4 and 5). Merged from cfanalytics:scripts/wrangler-config.test.mjs,
 // cfanalytics:scripts/lib/wrangler-config.mjs and cfmail:scripts/wrangler-config.test.mjs.
@@ -137,6 +139,37 @@ export function literalJurisdictionViolations(config: Wrangler): string[] {
     );
 }
 
+/** The names a block's `secrets.required` lists, or undefined when it declares no such list. */
+export function requiredSecrets(block: Record<string, unknown>): string[] | undefined {
+  const required = isRecord(block.secrets) ? block.secrets.required : undefined;
+  return Array.isArray(required) && required.every((n) => typeof n === "string")
+    ? required
+    : undefined;
+}
+
+/**
+ * Every block, the top level and each `env.<name>`, declares `secrets.required`,
+ * because Wrangler does not inherit it, and each list names exactly the
+ * secrets `.dev.vars.example` names (docs/conventions.md, section 4).
+ */
+export function requiredSecretViolations(config: Wrangler, secretNames: string[]): string[] {
+  const found: string[] = [];
+  for (const [name, block] of configBlocks(config)) {
+    const required = requiredSecrets(block);
+    if (required === undefined) {
+      found.push(
+        `${name} declares no secrets.required: list the Worker's secrets there, [] when it has none; Wrangler does not inherit it from the top level`,
+      );
+      continue;
+    }
+    for (const secret of required.filter((n) => !secretNames.includes(n)))
+      found.push(`${name}: secrets.required names ${secret}, which ${DEV_VARS_EXAMPLE} does not`);
+    for (const secret of secretNames.filter((n) => !required.includes(n)))
+      found.push(`${name}: ${DEV_VARS_EXAMPLE} names ${secret}, which secrets.required does not`);
+  }
+  return found;
+}
+
 /** The secret names a `.dev.vars.example` lists, one `NAME=` per line. */
 export function secretNamesOf(text: string): string[] {
   return text
@@ -162,7 +195,7 @@ function ignoredByGit(root: string, file: string): boolean | null {
 
 export const wranglerConfig: Check = {
   name: "wrangler-config",
-  summary: `${WRANGLER} holds no ids, real hostnames, email addresses or secrets, and writes in no jurisdiction`,
+  summary: `${WRANGLER} holds no ids, real hostnames, email addresses or secrets, writes in no jurisdiction, and lists its secrets as .dev.vars.example does`,
   async run({ root }) {
     const config = readWrangler(root);
     if (!config.ok) return config.problems;
@@ -172,6 +205,7 @@ export const wranglerConfig: Check = {
       ...deploymentValueViolations(config.value),
       ...secretViolations(config.value, secretNames),
       ...literalJurisdictionViolations(config.value),
+      ...requiredSecretViolations(config.value, secretNames),
     ].map((p) => `${WRANGLER}: ${p}`);
     const ignored = ignoredByGit(root, DEV_VARS);
     if (ignored === null)

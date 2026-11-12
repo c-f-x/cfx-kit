@@ -3,6 +3,7 @@ import path from "node:path";
 import { after, before, test } from "node:test";
 import { openRunScope, type RunScope } from "../run-scope.ts";
 import { runCli, writeFiles } from "../test-support/cli.ts";
+import { initRepo } from "../test-support/git.ts";
 import { groundFiles } from "../test-support/tool-repo.ts";
 import { callsHealthContract, layoutViolations } from "./layout.ts";
 
@@ -105,6 +106,10 @@ test("c-f-x check layout fails on a sample that lacks the tool files", async () 
   assert.match(stderr, /\.github\/dependabot\.yml is missing/);
   assert.match(stderr, /\.github\/FUNDING\.yml is missing/);
   assert.match(stderr, /docs\/decisions\.md is missing/);
+  assert.match(stderr, /CONTRIBUTING\.md is missing/);
+  assert.match(stderr, /\.github\/ISSUE_TEMPLATE\/ holds no issue template/);
+  assert.match(stderr, /\.dev\.vars\.example is missing/);
+  assert.match(stderr, /site\.example\.jsonc is missing/);
   assert.match(
     stderr,
     /no workflow in \.github\/workflows runs `weeder check --base origin\/master`/,
@@ -114,10 +119,10 @@ test("c-f-x check layout fails on a sample that lacks the tool files", async () 
   assert.match(stderr, /\.petalsrc is missing/);
   assert.match(stderr, /docs\/index\.html is missing/);
   assert.match(stderr, /docs\/\.nojekyll is missing/);
-  assert.match(stderr, /check layout: failed with 16 problems/);
+  assert.match(stderr, /check layout: failed with 20 problems/);
 });
 
-test("c-f-x check layout reads the ground rules from the disk: a README without its three ways to install", async () => {
+test("c-f-x check layout reads the ground rules from the disk: a README in no shape of the standard", async () => {
   const repo = path.join(scope.dir, "no-install");
   const files = groundFiles("cfx-sample");
   writeFiles(repo, {
@@ -128,10 +133,16 @@ test("c-f-x check layout reads the ground rules from the disk: a README without 
   });
   const { code, stderr } = await runCli(["check", "layout"], repo, scope.dir);
   assert.equal(code, 1);
-  assert.match(stderr, /README\.md has no ## Install section/);
+  assert.match(stderr, /README\.md: the line after the title must be one bold sentence/);
+  assert.match(
+    stderr,
+    /README\.md: the intro must end with the line that cfx-sample is part of c-f-x/,
+  );
+  assert.match(stderr, /README\.md: after the intro comes the screenshot/);
+  assert.match(stderr, /README\.md: its sections must be ## What it does, .*; it has none/);
   assert.match(stderr, /README\.md: its ## Support section must hold the Buy Me A Coffee badge/);
   assert.match(stderr, /\.husky\/ is here/);
-  assert.match(stderr, /check layout: failed with 3 problems/);
+  assert.match(stderr, /check layout: failed with 6 problems/);
 });
 
 test("c-f-x check layout passes a sample with every tool file", async () => {
@@ -141,4 +152,18 @@ test("c-f-x check layout passes a sample with every tool file", async () => {
   assert.equal(stderr, "");
   assert.equal(code, 0);
   assert.match(stdout, /check layout: passed/);
+});
+
+test("a tool started from templates/tool passes layout, docs and wrangler-config", async () => {
+  const repo = path.join(scope.dir, "from-templates");
+  writeFiles(repo, { ...TOOL_FILES, ...groundFiles("cfx-sample") });
+  initRepo(repo);
+  const checks = ["layout", "docs", "wrangler-config"];
+  const runs = await Promise.all(checks.map((check) => runCli(["check", check], repo, scope.dir)));
+  runs.forEach(({ code, stdout, stderr }, i) => {
+    const check = checks[i] ?? "";
+    assert.equal(stderr, "", check);
+    assert.equal(code, 0, check);
+    assert.match(stdout, new RegExp(`check ${check}: passed`));
+  });
 });
