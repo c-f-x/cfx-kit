@@ -1,0 +1,68 @@
+name: Release
+
+# A pushed tag v<version> releases @c-f-x/kit: the kit is checked, built and
+# packed, and the tarball is attached to the GitHub release for the tag. Tools
+# install it from the release's URL (README.md, "Install"). Nothing goes to
+# npm. The tarball is made the way packages/kit/src/release.test.ts makes it.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    # A public repository runs CI on GitHub's runners only
+    # (docs/conventions.md, section 16, rule 7).
+    runs-on: ubuntu-latest
+    permissions:
+      # Creating a release and uploading its tarball.
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - name: The tag names the kit's version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version=$(node -p "require('./packages/kit/package.json').version")
+          if [ "$TAG" != "v$version" ]; then
+            echo "tag $TAG does not match packages/kit/package.json version $version (expected v$version)" >&2
+            exit 1
+          fi
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm build
+      - name: Pack the kit
+        id: pack
+        run: |
+          mkdir "$RUNNER_TEMP/release"
+          pnpm --dir packages/kit pack --pack-destination "$RUNNER_TEMP/release"
+          tarball=$(find "$RUNNER_TEMP/release" -name '*.tgz')
+          tar -tzf "$tarball" package/dist/cli.js
+          echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
+      - name: Create the release with the tarball
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          TARBALL: ${{ steps.pack.outputs.tarball }}
+        run: |
+          name=$(basename "$TARBALL")
+          url="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/$name"
+          {
+            echo "@c-f-x/kit $TAG. A tool installs it with:"
+            echo
+            echo "~~~"
+            echo "pnpm add -D $url"
+            echo "~~~"
+          } > "$RUNNER_TEMP/notes.md"
+          gh release create "$TAG" "$TARBALL" --verify-tag --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md"

@@ -22,7 +22,7 @@ Shared code lives in `c-f-x/cfx-kit` and is published to npm as two packages:
 - `@c-f-x/kit` holds the ops runner, the site-file schema, admin sign-in, the lifetime sweep, and the guard checks, run as `c-f-x check <name>`. Its entry `@c-f-x/kit/worker` holds what a tool's Worker runs: the health handler and its contract test, `job`, `notify` and the key helpers. That entry imports no `node:` module, so a Worker can bundle it.
 - `@c-f-x/ui` holds the web components and theme tokens.
 
-Each repository installs these at a pinned version.
+Each repository installs these at a pinned version. Until they are on npm, each version of `@c-f-x/kit` is a tarball attached to the kit's GitHub release for that version, and a tool installs it from that URL (D-10).
 
 Reasons for one repository per tool:
 - Other people install one tool, not the family. Cloudflare's deploy button needs each app to be self-contained. Its docs say "Cloudflare does not fully support monorepos". They also say an app in a subdirectory "must be fully isolated within that subdirectory, including any dependencies. Otherwise, the build will fail." (developers.cloudflare.com/workers/platform/deploy-buttons/, read 2026-11-11). A tool that depends on the kit as a published package builds alone. A tool that depends on it as a workspace folder does not.
