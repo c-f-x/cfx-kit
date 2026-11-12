@@ -22,7 +22,7 @@ Shared code lives in `c-f-x/cfx-kit` and is published to npm as two packages:
 - `@c-f-x/kit` holds the ops runner, the site-file schema, admin sign-in, the lifetime sweep, and the guard checks, run as `c-f-x check <name>`. Its entry `@c-f-x/kit/worker` holds what a tool's Worker runs: the health handler and its contract test, `job`, `notify` and the key helpers. That entry imports no `node:` module, so a Worker can bundle it.
 - `@c-f-x/ui` holds the web components and theme tokens.
 
-Each repository installs these at a pinned version.
+Each repository installs these at a pinned version. Until they are on npm, each version of `@c-f-x/kit` is a tarball attached to the kit's GitHub release for that version, and a tool installs it from that URL (D-10).
 
 Reasons for one repository per tool:
 - Other people install one tool, not the family. Cloudflare's deploy button needs each app to be self-contained. Its docs say "Cloudflare does not fully support monorepos". They also say an app in a subdirectory "must be fully isolated within that subdirectory, including any dependencies. Otherwise, the build will fail." (developers.cloudflare.com/workers/platform/deploy-buttons/, read 2026-11-11). A tool that depends on the kit as a published package builds alone. A tool that depends on it as a workspace folder does not.
@@ -124,7 +124,7 @@ For example:
 | `Prober` | nothing | none | nothing |
 | `results` | one row per check run | 30 days | the daily sweep |
 
-Where data is stored is a choice each installation makes once, in its site file's `jurisdiction` (section 4): left out, which is the default, Cloudflare places the data; `"eu"` keeps it in the EU. A tool may have users anywhere, so no tool fixes a region (owner, 2026-11-12, D-10). The public `wrangler.jsonc` names no jurisdiction. The deploy joins the site's value into each D1 and R2 binding of the config it generates, and into the var `JURISDICTION` that Durable Object code reads (section 2). Cloudflare says "Jurisdictions can only be set on database creation and cannot be added or updated after the database exists" (developers.cloudflare.com/d1/configuration/data-location/, read 2026-11-11). So `install` sets the jurisdiction when it creates each store, and a deployment keeps the jurisdiction it was created with: the owner's deployments made in the EU stay there, and their site files say `"eu"`.
+Where data is stored is a choice each installation makes once, in its site file's `jurisdiction` (section 4): left out, which is the default, Cloudflare places the data; `"eu"` keeps it in the EU. A tool may have users anywhere, so no tool fixes a region (owner, 2026-11-12, D-11). The public `wrangler.jsonc` names no jurisdiction. The deploy joins the site's value into each D1 and R2 binding of the config it generates, and into the var `JURISDICTION` that Durable Object code reads (section 2). Cloudflare says "Jurisdictions can only be set on database creation and cannot be added or updated after the database exists" (developers.cloudflare.com/d1/configuration/data-location/, read 2026-11-11). So `install` sets the jurisdiction when it creates each store, and a deployment keeps the jurisdiction it was created with: the owner's deployments made in the EU stay there, and their site files say `"eu"`.
 
 What goes where:
 - Per-project data that grows (errors, results) goes in a SQLite Durable Object, as in cfanalytics. Cloudflare's page says Workers "may still access Durable Objects constrained to a jurisdiction from anywhere in the world", and that the object id "will be logged outside of the specified jurisdiction for billing and debugging purposes" (developers.cloudflare.com/durable-objects/reference/data-location/).
@@ -265,7 +265,7 @@ Check: `c-f-x check docs` fails, in every repository, on a missing `AGENTS.md`, 
 
 The kit's skill is `skills/c-f-x/SKILL.md`, named for the `c-f-x` command it teaches, and installed with `npx skills add c-f-x/cfx-kit`.
 
-**3. One README structure.** Every README has these parts, in this order (owner, 2026-11-12, D-11). The order follows standard-readme, which puts Install before Usage and the License last (github.com/RichardLitt/standard-readme/blob/main/spec.md, read 2026-11-12).
+**3. One README structure.** Every README has these parts, in this order (owner, 2026-11-12, D-12). The order follows standard-readme, which puts Install before Usage and the License last (github.com/RichardLitt/standard-readme/blob/main/spec.md, read 2026-11-12).
 - The title, `# <repository name>`.
 - One bold sentence, under 120 characters, with the same words as the repository's GitHub description.
 - Two or three sentences of intro, ending with the line that the tool is part of c-f-x, linked to `https://c-f-x.com`.

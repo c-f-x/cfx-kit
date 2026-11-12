@@ -55,7 +55,7 @@ Each check is tested on a sample repository it must flag and one it must pass.
 
 ## What it does not do
 
-- It is not published yet. `@c-f-x/kit` goes to npm when the first tool needs it, so today no tool can install it.
+- It is not on npm. Each version is a tarball attached to the kit's GitHub release for that version, and a tool installs it from there.
 - It does not deploy anything itself. Each tool composes the runner's steps with its own Wrangler commands.
 - A check reads files. It cannot see whether a test passes, a page looks right or a sentence is true. The tool's own suite and its reviewers decide those.
 
@@ -67,11 +67,13 @@ For agents working in a c-f-x tool, the skill says how to use the kit: the check
 npx skills add c-f-x/cfx-kit
 ```
 
-For a tool, once the package is on npm:
+For a tool, from the tarball the kit's release for that version carries:
 
 ```bash
-pnpm add -D @c-f-x/kit
+pnpm add -D https://github.com/c-f-x/cfx-kit/releases/download/v0.1.0/c-f-x-kit-0.1.0.tgz
 ```
+
+The URL pins the version. A later version is the same line with its number in both places.
 
 ## Use
 

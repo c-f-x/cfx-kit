@@ -1,8 +1,8 @@
 # cfx-kit
 
-The shared repository of c-f-x, a family of self-hosted tools that run on Cloudflare. Each tool lives in its own repository and is named `cfx-<job>` (D-1, D-2). This repository publishes `@c-f-x/kit`: the `c-f-x` command, which runs the rule checks every tool repository shares, and the code those tools have in common. The licence is MIT (D-6). The package is not published yet: its first publish needs the owner's npm sign-in, and comes when the first tool needs it.
+The shared repository of c-f-x, a family of self-hosted tools that run on Cloudflare. Each tool lives in its own repository and is named `cfx-<job>` (D-1, D-2). This repository releases `@c-f-x/kit`: the `c-f-x` command, which runs the rule checks every tool repository shares, and the code those tools have in common. The licence is MIT (D-6). Each version is a tarball attached to the GitHub release for its tag, and tools install it from that URL (D-10). It is not on npm: that publish needs the owner's npm sign-in.
 
-**State (2026-11-11):** foundations, the ops runner, the guards for tool repositories, the runtime helpers and the ground rules every repository meets (D-8, `docs/conventions.md` section 16), and since 2026-11-12 the repository standard with its templates (D-11) and the site's choice of where data is stored (D-10). The command has eight checks and one writing command, listed below. The package exports the run-scope library, the ops runner and the site-file schema. Its entry `@c-f-x/kit/worker` exports what a tool's Worker runs: the health handler and its contract test, `job`, `notify` and the key helpers. The first consumer of all of it is cfx-status.
+**State (2026-11-11):** foundations, the ops runner, the guards for tool repositories, the runtime helpers and the ground rules every repository meets (D-8, `docs/conventions.md` section 16), and since 2026-11-12 the repository standard with its templates (D-12) and the site's choice of where data is stored (D-11). The command has eight checks and one writing command, listed below. The package exports the run-scope library, the ops runner and the site-file schema. Its entry `@c-f-x/kit/worker` exports what a tool's Worker runs: the health handler and its contract test, `job`, `notify` and the key helpers. The first consumer of all of it is cfx-status.
 
 ## Start here
 
@@ -31,6 +31,7 @@ The shared repository of c-f-x, a family of self-hosted tools that run on Cloudf
 | `packages/kit/src/read.ts` | The kit's one result type: a value, or the problems |
 | `scripts/check.mjs` | `pnpm check`, run by the kit's step runner from source (`packages/kit/src/ops/run-steps.ts`) |
 | `scripts/hash-names.mjs` | Writes `research-names.ts` from research-only names on stdin (section 14). The names stay out of the repository. |
+| `.github/workflows/release.yml` | A release: on a tag `v<version>`, checks the tag against the kit's version, runs `pnpm check`, then builds, packs and attaches the tarball to the tag's GitHub release |
 | `docs/ideas/` | Ideas not yet shaped into a loop |
 
 The kit is TypeScript, built by `tsc` into the package's `dist` folder. Tests run the source directly: Node 24 strips the types, so the source uses only erasable syntax. The Worker helpers' tests run the source inside workerd, through Vitest and `@cloudflare/vitest-plugin` at the versions cfanalytics pins.
@@ -57,6 +58,8 @@ The kit is TypeScript, built by `tsc` into the package's `dist` folder. Tests ru
 | A pull request does not weaken tests, add stubs, swallow errors or carry secrets | weeder: the `weeder` CI job, and the git hooks of `weeder guard install --protect master` in each clone |
 | Each loop's code checks hold | `tend gate --base origin/master --runner "node --test --test-reporter=tap {evidence}"`, run by the agent before each merge. Nothing in CI runs it until tend is released. |
 | A run leaves nothing behind | `c-f-x check run-scope`, run by `pnpm check`: it runs `pnpm test` again with a temp folder of its own, and fails on any file, repository file or process the run leaves |
+| The release tarball installs into a tool, its `c-f-x` command and both entries run, and `README.md` and the skill show this version's install line | `packages/kit/src/release.test.ts`, which packs the kit as the release does |
+| A release's tag names the kit's version | the first step of `.github/workflows/release.yml` |
 | A run killed part-way leaves nothing after the next run | `packages/kit/src/run-scope.test.ts` |
 | `pnpm check` stops at its first failing step | `packages/kit/src/ops/run-steps.test.ts`, on the runner `scripts/check.mjs` uses |
 | No promise is left unawaited | oxlint `typescript/no-floating-promises`, type-aware. `test()` from `node:test` is exempt, because the runner awaits it. |
@@ -86,15 +89,15 @@ Measured on the owner's Mac on 2026-11-11, with a load average near 9 to 13 from
 |---|---|---|
 | `pnpm lint` | oxlint (type-aware) and Biome. tend's renderer, `docs/tend/loop.js`, is left out: tend writes it. | about 3.5 s |
 | `pnpm typecheck` | `tsc` on the kit, once with Node's types and once on the Worker code and its tests with the Workers types, and the scripts with `checkJs` | about 1.5 s |
-| `pnpm test` | The kit's tests: first `node --test`, then Vitest for the Worker helpers inside workerd (`packages/kit/test/`). The check tests run the command on sample repositories, which is most of the time. | about 6.5 s. The runners report 182 tests in 4.1 s for `node --test` and 21 in 0.4 s for Vitest (2026-11-12). |
+| `pnpm test` | The kit's tests: first `node --test`, then Vitest for the Worker helpers inside workerd (`packages/kit/test/`). The check tests run the command on sample repositories, which is most of the time. | about 5 to 6.5 s. The runners report 182 tests in 4.1 s for `node --test` and 21 in 0.4 s for Vitest (2026-11-12). The slowest file, `release.test.ts`, takes about 1.5 s: it builds, packs and installs the kit. |
 | `pnpm build` | `tsc` builds the kit | about 0.8 s |
-| `pnpm check` | Lint, typecheck, test and build in order, then the built command's docs, names and run-scope checks on this repository, stopping at the first failure. It removes the build when it made it. | about 10 s; 12.1 s on 2026-11-12, at a load average near 6 |
+| `pnpm check` | Lint, typecheck, test and build in order, then the built command's docs, names and run-scope checks on this repository, stopping at the first failure. It removes the build when it made it. | about 10 to 18 s; 12.1 s and 17.7 s on 2026-11-12, at load averages near 6 and 9 |
 
 When each runs:
 - **Every pull request:** `pnpm check`, locally before pushing and in CI on the pull request's merge result. The suite takes seconds, so it always runs whole. The first pull request's CI took 51 s from opening to verdict: 9 s queued, then 42 s on the runner, of which `pnpm check` took 7 s and the setup and install the rest (2026-11-11).
 - **The main line after each merge:** CI runs `pnpm check` on every push to `master`.
 - **Heavy tests:** none yet.
-- **A release:** none yet. Nothing is published (D-6).
+- **A release:** the lead bumps `version` in `packages/kit/package.json` and the install lines in `README.md` and the skill in one pull request (`release.test.ts` fails until they agree), merges it, then pushes the tag `v<version>`. The release workflow runs `pnpm check` again before it packs. Nothing goes to npm (D-10).
 
 While working, run one test file from `packages/kit`: `node --test src/checks/docs.test.ts`, or `npx vitest run test/job.test.ts` for a Worker helper. Check each command's exit code; never filter its output to decide whether it passed.
 
@@ -102,7 +105,7 @@ Known noise: the Vitest run prints one `uncaught exception ... email to someone@
 
 ## CI
 
-CI runs on the owner's Mac: one self-hosted runner, labelled `cfx-kit`, set up with the ci-runner skill (D-4). It runs only while the Mac is awake and logged in. Two jobs: `check` runs `pnpm check`, and on pull requests `weeder` installs weeder v0.5.0 from its release and judges the diff. The workflow takes every tool from its setup steps and shares nothing by a fixed name. To return to GitHub's runners, set the repository variable `CI_RUNS_ON` to `"ubuntu-latest"` (with the quotes). Opening the repository means doing that and removing the runner in the same step, because a runner executes any pull request's code (section 16, rule 7). The weeder job then switches to SARIF and code scanning.
+CI runs on GitHub's hosted runners: the repository variable `CI_RUNS_ON` is `"ubuntu-latest"`, and a public repository never runs CI on the owner's Mac (section 16, rule 7). Two jobs in `.github/workflows/ci.yml`: `check` runs `pnpm check`, and on pull requests `weeder` installs weeder v0.5.0 from its release and judges the diff. The workflow takes every tool from its setup steps and shares nothing by a fixed name. Its `runs-on` still falls back to the Mac runner of D-4 when the variable is unset; never unset it. The release workflow, `.github/workflows/release.yml`, runs on `ubuntu-latest` only, and only it may write to the repository, to create the release. Still to come: the weeder job's switch to SARIF and code scanning.
 
 ## Tooling
 

@@ -94,7 +94,17 @@ The decision log of the c-f-x family. One entry per decision. A decision is neve
 
 **Consequences.** This supersedes D-1's tool-name rule; the rest of D-1 stands. The repositories were renamed on GitHub, which redirects the old URLs. The CI runner is labelled after the new name. Entries above keep their original words.
 
-## D-10 · Each installation chooses where its data is stored · accepted (2026-11-12)
+## D-10 · Kit versions ship as GitHub release tarballs, not on npm yet · accepted (2026-11-12)
+
+**Made by.** The lead.
+
+**Context.** cfx-mail and cfx-analytics need `@c-f-x/kit` to run `c-f-x check` and use the kit's code. npm needs the owner's sign-in (D-6). A git dependency does not work: tested on 2026-11-11, `pnpm add github:c-f-x/cfx-kit#<sha>&path:/packages/kit` installs `package.json` and no `dist`, because `dist` is built, never committed, so the `c-f-x` command crashes.
+
+**Decision.** For each tag `v<version>`, CI checks that the tag equals the kit's version, runs `pnpm check`, builds the kit, packs it, and attaches the tarball to the tag's GitHub release (`.github/workflows/release.yml`). A tool installs it with `pnpm add -D https://github.com/c-f-x/cfx-kit/releases/download/v<version>/c-f-x-kit-<version>.tgz`. The package keeps `"private": true`.
+
+**Consequences.** This changes how D-2's packages reach the tools; D-2's rest stands. The URL pins the version, so a tool moves to a new one by changing its install line. `packages/kit/src/release.test.ts` packs the kit the same way, installs it into a sample tool and runs its command, and fails when `README.md` or the skill shows another version's line. Publishing to npm stays the owner's step, for when a tool needs it.
+
+## D-11 · Each installation chooses where its data is stored · accepted (2026-11-12)
 
 **Made by.** The owner. In the owner's words: "we cant really limit data just to EU - we might have US users using our tools etc.... so Im not sure why that is a 'thing' really?". The rule it replaces, every store in the EU, was an agent's proposal, never the owner's ruling.
 
@@ -104,7 +114,7 @@ The decision log of the c-f-x family. One entry per decision. A decision is neve
 
 **Consequences.** A deploy joins the site's jurisdiction into the config it generates. Cloudflare cannot change a store's jurisdiction after it is made, so a deployment keeps the one it was created with: the owner's deployments made in the EU stay there, and their site files say `"eu"`. The install command creates stores in the site file's jurisdiction. `docs/conventions.md` sections 2, 4, 5 and 11 say so.
 
-## D-11 · One repository standard for every tool, held by the kit · accepted (2026-11-12)
+## D-12 · One repository standard for every tool, held by the kit · accepted (2026-11-12)
 
 **Made by.** The owner asked for it. In the owner's words: "the installs should perhaps be as standardised as possible - using common standards for open source projects? to ease setup and installation?", "the readmes should have a very clear structure that we reuse? i think a short intro, and a screenshot should be at the top?", and "how can we add all these points to the kit, so that agents will follow them?". The lead chose the standard and how it is checked.
 

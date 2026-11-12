@@ -7,7 +7,13 @@ description: Use when working in a c-f-x tool repository (a cfx-<job> tool on Cl
 
 `@c-f-x/kit` holds the rules the c-f-x tools share and the code that keeps them. A tool installs it at a pinned version. The rules themselves are in the kit's `docs/conventions.md`. Read the section a check names before you change code to satisfy it: a check holds a rule, and the rule is what matters.
 
-The package is not on npm yet. Until it is, a tool cannot install it, and only the kit's own repository runs this code.
+The package is not on npm. Each version is a tarball attached to the kit's GitHub release for that version. A tool installs it as a dev dependency from that URL, which pins the version:
+
+```
+pnpm add -D https://github.com/c-f-x/cfx-kit/releases/download/v0.1.0/c-f-x-kit-0.1.0.tgz
+```
+
+To move to a later version, run the same line with the new number in both places. Then run `pnpm exec c-f-x check <name>`.
 
 ## Start a new tool from the templates
 
