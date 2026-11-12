@@ -305,6 +305,21 @@ test("c-f-x check architecture passes a sample that keeps every rule", async () 
   assert.match(stdout, /check architecture: passed/);
 });
 
+// D-11 ended the exemption for a Durable Object that keeps nothing: under the
+// EU-only rule such a class could skip the jurisdiction. This holds that the
+// exemption stays gone. The sample's lifetimes row says Prober keeps nothing,
+// and a jurisdiction written into its code is still flagged.
+test("c-f-x check architecture gives a Durable Object that keeps nothing no exemption", async () => {
+  const repo = path.join(scope.dir, "keeps-nothing");
+  writeFiles(repo, {
+    ...CLEAN,
+    "src/probe-id.ts": 'export const id = (env) => env.PROBER.jurisdiction("eu").idFromName("weur");\n',
+  });
+  const { code, stderr } = await runCli(["check", "architecture"], repo, scope.dir);
+  assert.equal(code, 1);
+  assert.match(stderr, /src\/probe-id\.ts writes the jurisdiction "eu" into the code/);
+});
+
 test("c-f-x check architecture fails without a c-f-x.json to say where the code is", async () => {
   const repo = path.join(scope.dir, "unconfigured");
   writeFiles(repo, { "wrangler.jsonc": WRANGLER, "src/index.ts": "export {};\n" });
