@@ -287,9 +287,9 @@ export const architecture: Check = {
     "core/ is pure, slices meet through index.ts, no module state, one mail.ts, scheduled work through job, no jurisdiction written into the code",
   async run({ root }) {
     const config = readToolConfig(root);
-    const wrangler = readWrangler(root);
-    if (!config.ok || !wrangler.ok)
-      return [config, wrangler].flatMap((read) => (read.ok ? [] : read.problems));
+    if (!config.ok) return config.problems;
+    const wrangler = readWrangler(root, config.value.worker);
+    if (!wrangler.ok) return wrangler.problems;
     const files = [...new Set(config.value.sources.flatMap((dir) => sourceFiles(root, dir)))];
     const sources = readSources(root, files);
     return [

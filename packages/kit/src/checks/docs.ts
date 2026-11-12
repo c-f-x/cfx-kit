@@ -35,6 +35,9 @@ export type NamedPath = { path: string; planned: boolean };
  * top-level folder or ends in a file extension. URL paths ("/s/"), templates
  * ("<slice>"), globs, package names and other repos' paths ("repo:path") are
  * not this repo's files. A path followed by "(planned)" is not built yet.
+ * A path is read from the repository's root, in a package folder too, so a
+ * reader can open it without knowing which package a doc means
+ * (docs/conventions.md, section 13).
  */
 export function namedPaths(text: string): NamedPath[] {
   const paths: NamedPath[] = [];
@@ -46,6 +49,9 @@ export function namedPaths(text: string): NamedPath[] {
   }
   return paths;
 }
+
+const FROM_ROOT =
+  "; write a path from the repository's root, or as repo:path for a file in another repository";
 
 /** Paths a doc names that do not exist, and paths marked planned that now exist. */
 export function pathViolations(
@@ -59,7 +65,7 @@ export function pathViolations(
   for (const p of planned)
     if (exists(p)) found.push(`${doc}: ${p} exists, so drop its "(planned)"`);
   for (const { path: p } of named) {
-    if (!planned.has(p) && !exists(p)) found.push(`${doc}: ${p} does not exist`);
+    if (!planned.has(p) && !exists(p)) found.push(`${doc}: ${p} does not exist${FROM_ROOT}`);
   }
   return [...new Set(found)];
 }

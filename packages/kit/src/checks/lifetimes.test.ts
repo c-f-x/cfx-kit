@@ -107,6 +107,7 @@ test("the lifetimes check flags a store without a row and a row without a store"
       { kind: "Durable Object class", name: "Prober" },
     ],
     ["results", "alerts"],
+    "wrangler.jsonc",
   );
   assert.deepEqual(found, [
     "docs/data-model.md: the R2 bucket `BLOBS` in wrangler.jsonc has no lifetimes row",
@@ -174,4 +175,41 @@ test("c-f-x check lifetimes fails when the data model has no lifetimes table", a
   const { code, stderr } = await runCli(["check", "lifetimes"], repo, scope.dir);
   assert.equal(code, 1);
   assert.match(stderr, /docs\/data-model\.md: has no table under "## Lifetimes"/);
+});
+
+// The same tool as a monorepo: its Worker and migrations in apps/worker/.
+const MONOREPO = {
+  "c-f-x.json": JSON.stringify({
+    sources: [],
+    slices: [],
+    migrations: ["apps/worker/migrations"],
+    worker: "apps/worker",
+  }),
+  "apps/worker/wrangler.jsonc": WRANGLER,
+  "apps/worker/migrations/0001_init.sql": SAMPLE["migrations/0001_init.sql"],
+  "apps/worker/migrations/0002_alerts.sql": SAMPLE["migrations/0002_alerts.sql"],
+};
+
+test("c-f-x check lifetimes reads the stores from the Worker's wrangler.jsonc", async () => {
+  const repo = path.join(scope.dir, "monorepo-flagged");
+  writeFiles(repo, {
+    ...MONOREPO,
+    "docs/data-model.md": table(...ROWS.filter((r) => !/`BLOBS`/.test(r))),
+  });
+  const { code, stderr } = await runCli(["check", "lifetimes"], repo, scope.dir);
+  assert.equal(code, 1);
+  assert.match(
+    stderr,
+    /^docs\/data-model\.md: the R2 bucket `BLOBS` in apps\/worker\/wrangler\.jsonc has no lifetimes row$/m,
+  );
+  assert.match(stderr, /check lifetimes: failed with 1 problem$/m);
+});
+
+test("c-f-x check lifetimes passes a monorepo sample where every store has its row", async () => {
+  const repo = path.join(scope.dir, "monorepo-clean");
+  writeFiles(repo, { ...MONOREPO, "docs/data-model.md": table(...ROWS) });
+  const { code, stdout, stderr } = await runCli(["check", "lifetimes"], repo, scope.dir);
+  assert.equal(stderr, "");
+  assert.equal(code, 0);
+  assert.match(stdout, /check lifetimes: passed/);
 });

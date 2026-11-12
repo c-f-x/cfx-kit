@@ -1,7 +1,15 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { configBlocks, isRecord, readWrangler, WRANGLER, type Wrangler } from "./tool-config.ts";
+import {
+  configBlocks,
+  isRecord,
+  readToolConfig,
+  readWrangler,
+  WRANGLER,
+  type Wrangler,
+  workerPath,
+} from "./tool-config.ts";
 import type { Check } from "./types.ts";
 
 // `c-f-x check wrangler-config`: the template `wrangler.jsonc` in a public
@@ -195,23 +203,27 @@ function ignoredByGit(root: string, file: string): boolean | null {
 
 export const wranglerConfig: Check = {
   name: "wrangler-config",
-  summary: `${WRANGLER} holds no ids, real hostnames, email addresses or secrets, writes in no jurisdiction, and lists its secrets as .dev.vars.example does`,
+  summary: `the Worker's ${WRANGLER} holds no ids, real hostnames, email addresses or secrets, writes in no jurisdiction, and lists its secrets as ${DEV_VARS_EXAMPLE} does`,
   async run({ root }) {
-    const config = readWrangler(root);
+    const tool = readToolConfig(root);
+    if (!tool.ok) return tool.problems;
+    const { worker } = tool.value;
+    const config = readWrangler(root, worker);
     if (!config.ok) return config.problems;
-    const example = path.join(root, DEV_VARS_EXAMPLE);
+    const example = path.join(root, workerPath(worker, DEV_VARS_EXAMPLE));
     const secretNames = existsSync(example) ? secretNamesOf(readFileSync(example, "utf8")) : [];
     const problems = [
       ...deploymentValueViolations(config.value),
       ...secretViolations(config.value, secretNames),
       ...literalJurisdictionViolations(config.value),
       ...requiredSecretViolations(config.value, secretNames),
-    ].map((p) => `${WRANGLER}: ${p}`);
-    const ignored = ignoredByGit(root, DEV_VARS);
+    ].map((p) => `${workerPath(worker, WRANGLER)}: ${p}`);
+    const devVars = workerPath(worker, DEV_VARS);
+    const ignored = ignoredByGit(root, devVars);
     if (ignored === null)
-      problems.push(`${root} is not a git repository, so ${DEV_VARS} cannot be shown ignored`);
+      problems.push(`${root} is not a git repository, so ${devVars} cannot be shown ignored`);
     else if (!ignored)
-      problems.push(`${DEV_VARS} is not ignored by git, so its secrets could be committed`);
+      problems.push(`${devVars} is not ignored by git, so its secrets could be committed`);
     return problems;
   },
 };

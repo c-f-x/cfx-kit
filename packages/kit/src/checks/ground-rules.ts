@@ -2,8 +2,8 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { body, frontmatter, headingsOf, section } from "./markdown.ts";
 import { readmeViolations } from "./readme.ts";
-import { configBlocks, isRecord, parseWrangler, WRANGLER } from "./tool-config.ts";
-import { requiredSecrets } from "./wrangler-config.ts";
+import { configBlocks, isRecord, parseWrangler, WRANGLER, workerPath } from "./tool-config.ts";
+import { DEV_VARS_EXAMPLE, requiredSecrets } from "./wrangler-config.ts";
 
 // The ground rules every tool repository meets (docs/conventions.md, section
 // 16, the owner's ruling D-8): the files a public repository keeps from day
@@ -116,9 +116,10 @@ export const INSTALL_PARTS = [
 ] as const;
 const INSTALL_GUIDE = "Install and set up";
 
-// The secrets every block of the tool's wrangler.jsonc requires.
-function secretsOf(view: RepoView): string[] {
-  const config = parseWrangler(view.read(WRANGLER) ?? "{}");
+// The secrets every block of the Worker's wrangler.jsonc requires.
+function secretsOf(view: RepoView, worker: string): string[] {
+  const file = workerPath(worker, WRANGLER);
+  const config = parseWrangler(view.read(file) ?? "{}", file);
   if (!config.ok) return [];
   return [...new Set(configBlocks(config.value).flatMap(([, b]) => requiredSecrets(b) ?? []))];
 }
@@ -139,7 +140,7 @@ function needsTable(part: string): boolean {
 }
 
 /** AGENTS.md's `## Install and set up`, with its parts. A missing AGENTS.md is `c-f-x check docs`' to report. */
-function installGuideViolations(view: RepoView): string[] {
+function installGuideViolations(view: RepoView, worker: string): string[] {
   const brief = view.read("AGENTS.md");
   if (brief === undefined) return [];
   const guide = section(brief, INSTALL_GUIDE);
@@ -167,7 +168,7 @@ function installGuideViolations(view: RepoView): string[] {
     );
   const secrets = part("Secrets");
   if (secrets !== undefined) {
-    for (const name of secretsOf(view)) {
+    for (const name of secretsOf(view, worker)) {
       if (!new RegExp(`\\|[^|\\n]*\\bwrangler secret put ${name}\\b`).test(secrets))
         problems.push(
           `AGENTS.md: ### Secrets must pipe ${name} into \`wrangler secret put ${name}\`, so its value never shows on screen`,
@@ -210,8 +211,12 @@ function workflowViolations(view: RepoView): string[] {
   return problems;
 }
 
-/** The ground rules `view` breaks, each as one problem. */
-export function groundRuleViolations(view: RepoView): string[] {
+/**
+ * The ground rules `view` breaks, each as one problem. `worker` is the folder
+ * that holds the Worker's `wrangler.jsonc` and `.dev.vars.example`, from the
+ * tool's `c-f-x.json`; every other file is read at the root.
+ */
+export function groundRuleViolations(view: RepoView, worker: string): string[] {
   const name = toolName(view);
   const problems: string[] = [];
   if (name === undefined)
@@ -225,7 +230,7 @@ export function groundRuleViolations(view: RepoView): string[] {
         : readmeViolations(readme, name, (p) => view.read(p) !== undefined)),
     );
   }
-  problems.push(...installGuideViolations(view));
+  problems.push(...installGuideViolations(view, worker));
   if (!(view.read("LICENSE") ?? "").startsWith("MIT License"))
     problems.push("LICENSE is missing or is not the MIT License (D-6)");
   if (!(view.read("SECURITY.md") ?? "").includes(SECURITY_ADDRESS))
@@ -248,9 +253,10 @@ export function groundRuleViolations(view: RepoView): string[] {
     !view.list(ISSUE_TEMPLATES).some((f) => /\.(md|ya?ml)$/.test(f) && !/^config\.ya?ml$/.test(f))
   )
     problems.push(`${ISSUE_TEMPLATES}/ holds no issue template`);
-  if (view.read(".dev.vars.example") === undefined)
+  const example = workerPath(worker, DEV_VARS_EXAMPLE);
+  if (view.read(example) === undefined)
     problems.push(
-      ".dev.vars.example is missing: it names the Worker's secrets, exactly those in wrangler.jsonc's secrets.required",
+      `${example} is missing: it names the Worker's secrets, exactly those in ${workerPath(worker, WRANGLER)}'s secrets.required`,
     );
   if (view.read("site.example.jsonc") === undefined)
     problems.push(

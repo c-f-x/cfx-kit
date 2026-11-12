@@ -328,3 +328,54 @@ test("c-f-x check architecture fails without a c-f-x.json to say where the code 
   assert.equal(code, 1);
   assert.match(stderr, /c-f-x\.json is missing/);
 });
+
+// The CLEAN sample moved into a monorepo: the Worker and its sources in apps/worker/.
+const MONOREPO = {
+  ...Object.fromEntries(
+    Object.entries(CLEAN)
+      .filter(([p]) => p.startsWith("src/"))
+      .map(([p, text]) => [`apps/worker/${p}`, text]),
+  ),
+  "c-f-x.json": JSON.stringify({
+    sources: ["apps/worker/src"],
+    slices: ["apps/worker/src/features"],
+    migrations: [],
+    worker: "apps/worker",
+  }),
+  "apps/worker/wrangler.jsonc": WRANGLER,
+  "docs/data-model.md": DATA_MODEL,
+};
+
+test("c-f-x check architecture reads the email bindings from the Worker's wrangler.jsonc", async () => {
+  const repo = path.join(scope.dir, "monorepo-flagged");
+  writeFiles(repo, {
+    ...MONOREPO,
+    "apps/worker/src/features/pages/notify.ts":
+      "export const tell = (env) => env.ALERT.send({ text: 'x' });\n",
+  });
+  const { code, stderr } = await runCli(["check", "architecture"], repo, scope.dir);
+  assert.equal(code, 1);
+  assert.match(
+    stderr,
+    /^apps\/worker\/src\/features\/pages\/notify\.ts sends through the email binding ALERT; only mail\.ts sends mail$/m,
+  );
+  assert.match(stderr, /check architecture: failed with 1 problem$/m);
+});
+
+test("c-f-x check architecture passes a monorepo sample that keeps every rule", async () => {
+  const repo = path.join(scope.dir, "monorepo-clean");
+  writeFiles(repo, MONOREPO);
+  const { code, stdout, stderr } = await runCli(["check", "architecture"], repo, scope.dir);
+  assert.equal(stderr, "");
+  assert.equal(code, 0);
+  assert.match(stdout, /check architecture: passed/);
+});
+
+test("c-f-x check architecture reads no wrangler.jsonc outside the Worker's folder", async () => {
+  const repo = path.join(scope.dir, "monorepo-at-root");
+  const { "apps/worker/wrangler.jsonc": _worker, ...files } = MONOREPO;
+  writeFiles(repo, { ...files, "wrangler.jsonc": WRANGLER });
+  const { code, stderr } = await runCli(["check", "architecture"], repo, scope.dir);
+  assert.equal(code, 1);
+  assert.match(stderr, /^apps\/worker\/wrangler\.jsonc is missing$/m);
+});

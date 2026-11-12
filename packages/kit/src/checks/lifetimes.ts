@@ -8,6 +8,7 @@ import {
   type Store,
   storeBindings,
   WRANGLER,
+  workerPath,
 } from "./tool-config.ts";
 import type { Check } from "./types.ts";
 
@@ -129,19 +130,20 @@ export function tablesOf(steps: string[]): string[] {
   return [...tables];
 }
 
-/** Stores without a lifetimes row, and rows that name no store. */
+/** Stores without a lifetimes row, and rows that name no store. `wrangler` is the config's repository path. */
 export function lifetimeViolations(
   doc: string,
   rows: LifetimeRow[],
   bindings: Store[],
   tables: string[],
+  wrangler: string,
 ): string[] {
   const named = new Set(rows.map((r) => r.store));
   const stores = new Set([...bindings.map((b) => b.name), ...tables]);
   return [
     ...bindings
       .filter((b) => !named.has(b.name))
-      .map((b) => `${doc}: the ${b.kind} \`${b.name}\` in ${WRANGLER} has no lifetimes row`),
+      .map((b) => `${doc}: the ${b.kind} \`${b.name}\` in ${wrangler} has no lifetimes row`),
     ...tables
       .filter((t) => !named.has(t))
       .map((t) => `${doc}: the table \`${t}\` in the migrations has no lifetimes row`),
@@ -166,10 +168,12 @@ export const lifetimes: Check = {
   summary: `every binding and table has a row in the lifetimes table of ${DATA_MODEL}`,
   async run({ root }) {
     const config = readToolConfig(root);
-    const wrangler = readWrangler(root);
+    if (!config.ok) return config.problems;
+    const { worker } = config.value;
+    const wrangler = readWrangler(root, worker);
     const table = readLifetimes(root);
-    if (!config.ok || !wrangler.ok || !table.ok) {
-      return [config, wrangler, table].flatMap((read) => (read.ok ? [] : read.problems));
+    if (!wrangler.ok || !table.ok) {
+      return [wrangler, table].flatMap((read) => (read.ok ? [] : read.problems));
     }
     const steps = stepFiles(root, config.value.migrations).map((f) =>
       readFileSync(path.join(root, f), "utf8"),
@@ -181,6 +185,7 @@ export const lifetimes: Check = {
         table.value.rows,
         storeBindings(wrangler.value),
         tablesOf(steps),
+        workerPath(worker, WRANGLER),
       ),
     ];
   },

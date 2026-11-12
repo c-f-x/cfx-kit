@@ -382,12 +382,12 @@ const BREAKS: [string, Record<string, string>, string][] = [
 ];
 
 test("the ground rules pass a tool repository that keeps every one", () => {
-  assert.deepEqual(groundRuleViolations(view(CLEAN)), []);
+  assert.deepEqual(groundRuleViolations(view(CLEAN), "."), []);
 });
 
 for (const [name, files, problem] of BREAKS) {
   test(`the ground rules flag ${name}`, () => {
-    assert.deepEqual(groundRuleViolations(view(files)), [problem]);
+    assert.deepEqual(groundRuleViolations(view(files), "."), [problem]);
   });
 }
 
@@ -397,7 +397,7 @@ test("the ground rules read the install lines only inside the Install section", 
     "## Use\n",
     `## Use\n\nnpx skills add c-f-x/${NAME}\n`,
   );
-  assert.deepEqual(groundRuleViolations(view({ ...moved, "README.md": text })), [INSTALL]);
+  assert.deepEqual(groundRuleViolations(view({ ...moved, "README.md": text }), "."), [INSTALL]);
 });
 
 test("a heading inside a code block is not a section, and does not end one", () => {
@@ -406,7 +406,7 @@ test("a heading inside a code block is not a section, and does not end one", () 
     `npx skills add c-f-x/${NAME}\n`,
     `npx skills add c-f-x/${NAME}\n## not a section\n`,
   );
-  assert.deepEqual(groundRuleViolations(view(fenced)), []);
+  assert.deepEqual(groundRuleViolations(view(fenced), "."), []);
 });
 
 test("the optional sections may be left out or added, in their place", () => {
@@ -415,7 +415,7 @@ test("the optional sections may be left out or added, in their place", () => {
     "## Support",
     "## Credits\n\nThe projects this stands on.\n\n## Support",
   );
-  assert.deepEqual(groundRuleViolations(view(withFile("README.md", credits))), []);
+  assert.deepEqual(groundRuleViolations(view(withFile("README.md", credits)), "."), []);
 });
 
 test("a tool with no screen shows real terminal output instead of a picture", () => {
@@ -427,5 +427,32 @@ test("a tool with no screen shows real terminal output instead of a picture", ()
   const files = Object.fromEntries(
     Object.entries(terminal).filter(([p]) => !p.startsWith("docs/images/")),
   );
-  assert.deepEqual(groundRuleViolations(view(files)), []);
+  assert.deepEqual(groundRuleViolations(view(files), "."), []);
+});
+
+// A monorepo tool keeps its Worker in apps/worker/: its config and secrets list sit there.
+const WORKER = "apps/worker";
+const MONOREPO = Object.fromEntries(
+  Object.entries(CLEAN).map(([p, text]) => [
+    p === "wrangler.jsonc" || p === ".dev.vars.example" ? `${WORKER}/${p}` : p,
+    text,
+  ]),
+);
+
+test("the ground rules read the Worker's config and secrets list in its folder", () => {
+  assert.deepEqual(groundRuleViolations(view(MONOREPO), WORKER), []);
+  const { [`${WORKER}/.dev.vars.example`]: _example, ...noExample } = MONOREPO;
+  assert.deepEqual(groundRuleViolations(view(noExample), WORKER), [
+    "apps/worker/.dev.vars.example is missing: it names the Worker's secrets, exactly those in apps/worker/wrangler.jsonc's secrets.required",
+  ]);
+  const wrangler = (MONOREPO[`${WORKER}/wrangler.jsonc`] ?? "").replace(
+    '"AUTH_SECRET",',
+    '"AUTH_SECRET", "SESSION_KEY",',
+  );
+  assert.deepEqual(
+    groundRuleViolations(view({ ...MONOREPO, [`${WORKER}/wrangler.jsonc`]: wrangler }), WORKER),
+    [
+      "AGENTS.md: ### Secrets must pipe SESSION_KEY into `wrangler secret put SESSION_KEY`, so its value never shows on screen",
+    ],
+  );
 });

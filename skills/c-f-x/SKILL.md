@@ -22,8 +22,8 @@ The kit's `templates/tool/` holds the files a new tool copies: `README.md`, `AGE
 1. Copy them from a shallow clone in a temp folder: `git clone --depth 1 https://github.com/c-f-x/cfx-kit "$TMPDIR/cfx-kit"`, then `cp -R "$TMPDIR/cfx-kit/templates/tool/." .` in the new tool's folder.
 2. Replace the name everywhere: rename `skills/cfx-example` to `skills/<tool>`, and replace `cfx-example` with the tool's name in every copied file.
 3. Copy `LICENSE`, `SECURITY.md`, `.github/dependabot.yml` and `.github/FUNDING.yml` from the kit's root. They are the same in every repository.
-4. Rewrite each sentence that says what to write, in the tool's own words. Keep every heading, its order and the install guide's parts. Each secret the tool's `wrangler.jsonc` lists in `secrets.required` gets a line in `.dev.vars.example` and a piped line under `### Secrets`.
-5. Run `c-f-x check layout`, `c-f-x check docs` and `c-f-x check wrangler-config`, and fix what they flag.
+4. Rewrite each sentence that says what to write, in the tool's own words. Keep every heading, its order and the install guide's parts. Each secret the tool's `wrangler.jsonc` lists in `secrets.required` gets a line in `.dev.vars.example` and a piped line under `### Secrets`. When the Worker lives in a package folder, move `.dev.vars.example` there, beside its `wrangler.jsonc`.
+5. Write `c-f-x.json` (below), then run `c-f-x check layout`, `c-f-x check docs` and `c-f-x check wrangler-config`, and fix what they flag.
 
 The README needs a real screenshot of the main screen with made-up data, light and dark, in `docs/images/`. A tool without a screen shows real terminal output in a `console` block instead. Whether the screenshot looks right is the owner's call. Do not offer Cloudflare's deploy button: `docs/conventions.md` section 11 says when it may be.
 
@@ -33,7 +33,7 @@ Run each from the tool repository's own folder. Exit 0 passes, 1 fails with one 
 
 | Command | Fails when |
 |---|---|
-| `c-f-x check docs` | a doc names a path that does not exist, `AGENTS.md` is missing, longer than 150 lines or has no `## Test strategy`, or `CLAUDE.md` holds anything but `@AGENTS.md` |
+| `c-f-x check docs` | a doc names a path that does not exist (read from the repository's root), `AGENTS.md` is missing, longer than 150 lines or has no `## Test strategy`, or `CLAUDE.md` holds anything but `@AGENTS.md` |
 | `c-f-x check names` | a tracked file names a vendor known only from research |
 | `c-f-x check layout` | a file every tool keeps is missing, no test runs the health contract, or a ground rule is broken: the README's order, the install guide in `AGENTS.md`, the skill, the public files, the weeder and petals jobs, the tend map, the landing page |
 | `c-f-x check architecture` | `core/` does I/O, slices reach into each other, module state, mail sent outside one `mail.ts`, scheduled work outside `job`, a jurisdiction written into the code |
@@ -42,7 +42,9 @@ Run each from the tool repository's own folder. Exit 0 passes, 1 fails with one 
 | `c-f-x check wrangler-config` | `wrangler.jsonc` holds an id, a real hostname, an email address, a secret or a jurisdiction, or a block's `secrets.required` differs from `.dev.vars.example`. Where data is stored is the site file's `jurisdiction`. |
 | `c-f-x check run-scope` | `pnpm test` leaves a file, a repository file or a process behind |
 
-`c-f-x.json` at the tool's root tells the checks where its code is: `{ "sources": ["src"], "slices": ["src/features"], "migrations": ["migrations"] }`. Add `"vendors": [...]` for the vendors the tool integrates, whose names its public text may use. Never add a name to `vendors` to silence `names` when the tool does not use that vendor's code or SDK; reword the text instead.
+`c-f-x.json` at the tool's root tells the checks where its code is: `{ "sources": ["src"], "slices": ["src/features"], "migrations": ["migrations"] }`. When the Worker lives in a package folder, add `"worker": "apps/worker"`: the checks then read its `wrangler.jsonc`, `.dev.vars.example` and tests there, and only there. Add `"vendors": [...]` for the vendors the tool integrates, whose names its public text may use. Never add a name to `vendors` to silence `names` when the tool does not use that vendor's code or SDK; reword the text instead.
+
+In docs, write each path from the repository's root, even in a section about one package, and a file in another repository as `repo:path`, such as `cfanalytics:scripts/ops.mjs`.
 
 Fix what a check flags in the tool. Never weaken a check, add an exception to its sample, or edit `migrations.lock.json` by hand.
 

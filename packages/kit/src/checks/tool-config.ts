@@ -17,16 +17,26 @@ export const WRANGLER = "wrangler.jsonc";
  * - `migrations`: folders of numbered `.sql` schema steps.
  * - `vendors`: the vendors the tool integrates, whose names its public text
  *   may use (`c-f-x check names`). Optional, and empty when left out.
+ * - `worker`: the folder that holds the Worker: its `wrangler.jsonc`,
+ *   `.dev.vars.example` and tests. Optional; left out, it is the root, ".".
  */
 export type ToolConfig = {
   sources: string[];
   slices: string[];
   migrations: string[];
   vendors: string[];
+  worker: string;
 };
 
 const FOLDER_KEYS = ["sources", "slices", "migrations"] as const;
-const KEYS = [...FOLDER_KEYS, "vendors"] as const;
+const KEYS = [...FOLDER_KEYS, "vendors", "worker"] as const;
+const ROOT = ".";
+
+// A folder is a repository path, compared as text, so "src/" and "./src" become "src".
+const cleanFolder = (folder: string): string => path.posix.normalize(folder).replace(/\/$/, "");
+
+/** The repository path of `file` in the Worker's folder. */
+export const workerPath = (worker: string, file: string): string => path.posix.join(worker, file);
 
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -55,8 +65,7 @@ export function parseToolConfig(text: string, exists: (p: string) => boolean): R
       problems.push(`${TOOL_CONFIG}: "${key}" must be a list of folders`);
       return [];
     }
-    // A folder is a repository path, compared as text, so "src/" and "./src" become "src".
-    const clean = folders.map((f) => path.posix.normalize(f).replace(/\/$/, ""));
+    const clean = folders.map(cleanFolder);
     for (const folder of clean) {
       if (!exists(folder))
         problems.push(`${TOOL_CONFIG}: "${key}" names ${folder}, which does not exist`);
@@ -66,9 +75,14 @@ export function parseToolConfig(text: string, exists: (p: string) => boolean): R
   const [sources = [], slices = [], migrations = []] = lists;
   const vendors = value.vendors ?? [];
   if (!isStrings(vendors)) problems.push(`${TOOL_CONFIG}: "vendors" must be a list of names`);
+  const worker = typeof value.worker === "string" ? cleanFolder(value.worker) : ROOT;
+  if (value.worker !== undefined && typeof value.worker !== "string")
+    problems.push(`${TOOL_CONFIG}: "worker" must be one folder, the one that holds ${WRANGLER}`);
+  else if (worker !== ROOT && !exists(worker))
+    problems.push(`${TOOL_CONFIG}: "worker" names ${worker}, which does not exist`);
   return problems.length > 0 || !isStrings(vendors)
     ? { ok: false, problems }
-    : { ok: true, value: { sources, slices, migrations, vendors } };
+    : { ok: true, value: { sources, slices, migrations, vendors, worker } };
 }
 
 export function readToolConfig(root: string): Read<ToolConfig> {
@@ -80,22 +94,27 @@ export function readToolConfig(root: string): Read<ToolConfig> {
 /** A parsed `wrangler.jsonc`. */
 export type Wrangler = Record<string, unknown>;
 
-/** The Wrangler config from its JSONC text. A syntax error is a problem, not a guess. */
-export function parseWrangler(text: string): Read<Wrangler> {
+/**
+ * The Wrangler config from its JSONC text, with `file` its repository path for
+ * the problems. A syntax error is a problem, not a guess.
+ */
+export function parseWrangler(text: string, file: string): Read<Wrangler> {
   const errors: ParseError[] = [];
   const value: unknown = parse(text, errors, { allowTrailingComma: true });
   if (errors.length > 0) {
     const where = errors.map((e) => `${printParseErrorCode(e.error)} at offset ${e.offset}`);
-    return { ok: false, problems: [`${WRANGLER}: does not parse: ${where.join(", ")}`] };
+    return { ok: false, problems: [`${file}: does not parse: ${where.join(", ")}`] };
   }
-  if (!isRecord(value)) return { ok: false, problems: [`${WRANGLER}: must be an object`] };
+  if (!isRecord(value)) return { ok: false, problems: [`${file}: must be an object`] };
   return { ok: true, value };
 }
 
-export function readWrangler(root: string): Read<Wrangler> {
-  const file = path.join(root, WRANGLER);
-  if (!existsSync(file)) return { ok: false, problems: [`${WRANGLER} is missing`] };
-  return parseWrangler(readFileSync(file, "utf8"));
+/** The `wrangler.jsonc` in the Worker's folder, `worker`, a repository path. */
+export function readWrangler(root: string, worker: string): Read<Wrangler> {
+  const file = workerPath(worker, WRANGLER);
+  const full = path.join(root, file);
+  if (!existsSync(full)) return { ok: false, problems: [`${file} is missing`] };
+  return parseWrangler(readFileSync(full, "utf8"), file);
 }
 
 /** The top-level block and each deployment block under "env", each with its name. */
