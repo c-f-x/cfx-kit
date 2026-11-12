@@ -129,9 +129,13 @@ const CLEAN_WRANGLER = `{
 }
 `;
 
+// A tool whose Worker sits at the repository's root.
+const ROOT_CONFIG = JSON.stringify({ sources: [], slices: [], migrations: [] });
+
 test("c-f-x check wrangler-config fails on a sample with deployment values, a secret and a written-in jurisdiction", async () => {
   const repo = path.join(scope.dir, "flagged");
   writeFiles(repo, {
+    "c-f-x.json": ROOT_CONFIG,
     "wrangler.jsonc": `{
       "name": "cfx-sample",
       "account_id": "${ACCOUNT}",
@@ -162,6 +166,7 @@ test("c-f-x check wrangler-config fails on a sample with deployment values, a se
 test("c-f-x check wrangler-config passes a template with only example values", async () => {
   const repo = path.join(scope.dir, "clean");
   writeFiles(repo, {
+    "c-f-x.json": ROOT_CONFIG,
     "wrangler.jsonc": CLEAN_WRANGLER,
     ".dev.vars.example": "AUTH_SECRET=\n",
     ".gitignore": ".dev.vars\n",
@@ -175,8 +180,74 @@ test("c-f-x check wrangler-config passes a template with only example values", a
 
 test("c-f-x check wrangler-config fails on JSONC that does not parse", async () => {
   const repo = path.join(scope.dir, "broken");
-  writeFiles(repo, { "wrangler.jsonc": '{ "name": "cfx-sample" "main": "x" }' });
+  writeFiles(repo, {
+    "c-f-x.json": ROOT_CONFIG,
+    "wrangler.jsonc": '{ "name": "cfx-sample" "main": "x" }',
+  });
   const { code, stderr } = await runCli(["check", "wrangler-config"], repo, scope.dir);
   assert.equal(code, 1);
   assert.match(stderr, /wrangler\.jsonc: does not parse: CommaExpected/);
+});
+
+// A monorepo tool: the Worker, its secrets list and its .dev.vars in apps/worker/.
+const MONOREPO_CONFIG = JSON.stringify({
+  sources: [],
+  slices: [],
+  migrations: [],
+  worker: "apps/worker",
+});
+
+test("c-f-x check wrangler-config reads the Worker's config, secrets list and .dev.vars in its folder", async () => {
+  const repo = path.join(scope.dir, "monorepo-flagged");
+  writeFiles(repo, {
+    "c-f-x.json": MONOREPO_CONFIG,
+    // A config at the root is not the Worker's, so the check never reads it.
+    "wrangler.jsonc": CLEAN_WRANGLER,
+    ".dev.vars.example": "AUTH_SECRET=\n",
+    "apps/worker/wrangler.jsonc": `{
+      "name": "cfx-sample",
+      "account_id": "${ACCOUNT}",
+      "secrets": { "required": ["AUTH_SECRET"] },
+    }`,
+    "apps/worker/.dev.vars.example": "AUTH_SECRET=\nSESSION_KEY=\n",
+    // Ignores only the root's .dev.vars, not the Worker's.
+    ".gitignore": "/.dev.vars\n",
+  });
+  initRepo(repo);
+  const { code, stderr } = await runCli(["check", "wrangler-config"], repo, scope.dir);
+  assert.equal(code, 1);
+  assert.match(stderr, /^apps\/worker\/wrangler\.jsonc: account_id holds an account id$/m);
+  assert.match(
+    stderr,
+    /^apps\/worker\/wrangler\.jsonc: top level: \.dev\.vars\.example names SESSION_KEY, which secrets\.required does not$/m,
+  );
+  assert.match(
+    stderr,
+    /^apps\/worker\/\.dev\.vars is not ignored by git, so its secrets could be committed$/m,
+  );
+  assert.match(stderr, /check wrangler-config: failed with 3 problems/);
+});
+
+test("c-f-x check wrangler-config passes a monorepo template with only example values", async () => {
+  const repo = path.join(scope.dir, "monorepo-clean");
+  writeFiles(repo, {
+    "c-f-x.json": MONOREPO_CONFIG,
+    "apps/worker/wrangler.jsonc": CLEAN_WRANGLER,
+    "apps/worker/.dev.vars.example": "AUTH_SECRET=\n",
+    ".gitignore": ".dev.vars\n",
+  });
+  initRepo(repo);
+  const { code, stdout, stderr } = await runCli(["check", "wrangler-config"], repo, scope.dir);
+  assert.equal(stderr, "");
+  assert.equal(code, 0);
+  assert.match(stdout, /check wrangler-config: passed/);
+});
+
+test("c-f-x check wrangler-config fails without a c-f-x.json to say where the Worker is", async () => {
+  const repo = path.join(scope.dir, "unconfigured");
+  writeFiles(repo, { "wrangler.jsonc": CLEAN_WRANGLER, ".dev.vars.example": "AUTH_SECRET=\n" });
+  const { code, stderr } = await runCli(["check", "wrangler-config"], repo, scope.dir);
+  assert.equal(code, 1);
+  assert.match(stderr, /c-f-x\.json is missing/);
+  assert.match(stderr, /check wrangler-config: failed with 1 problem$/m);
 });

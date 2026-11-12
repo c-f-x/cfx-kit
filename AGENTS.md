@@ -68,7 +68,7 @@ The kit is TypeScript, built by `tsc` into the package's `dist` folder. Tests ru
 
 ## Checks for tool repositories
 
-A tool runs these from its own folder, with `docs` and `run-scope` above. Each rule, and the tool's `c-f-x.json` that says where its code is, is in `docs/conventions.md`. This repository is not a tool, so it does not run the tool checks on itself.
+A tool runs these from its own folder, with `docs` and `run-scope` above. Each rule, and the tool's `c-f-x.json` that says where its code and its Worker are, is in `docs/conventions.md`. This repository is not a tool, so it does not run the tool checks on itself.
 
 | Command | Holds (conventions section) |
 |---|---|
@@ -89,7 +89,7 @@ Measured on the owner's Mac on 2026-11-11, with a load average near 9 to 13 from
 |---|---|---|
 | `pnpm lint` | oxlint (type-aware) and Biome. tend's renderer, `docs/tend/loop.js`, is left out: tend writes it. | about 3.5 s |
 | `pnpm typecheck` | `tsc` on the kit, once with Node's types and once on the Worker code and its tests with the Workers types, and the scripts with `checkJs` | about 1.5 s |
-| `pnpm test` | The kit's tests: first `node --test`, then Vitest for the Worker helpers inside workerd (`packages/kit/test/`). The check tests run the command on sample repositories, which is most of the time. | about 5 to 6.5 s. The runners report 182 tests in 4.1 s for `node --test` and 21 in 0.4 s for Vitest (2026-11-12). The slowest file, `release.test.ts`, takes about 1.5 s: it builds, packs and installs the kit. |
+| `pnpm test` | The kit's tests: first `node --test`, then Vitest for the Worker helpers inside workerd (`packages/kit/test/`). The check tests run the command on sample repositories, which is most of the time. | about 5 to 6.5 s. The runners report 201 tests in 4.3 s for `node --test` and 21 in 0.4 s for Vitest (2026-11-12). The slowest file, `release.test.ts`, takes about 1.5 s: it builds, packs and installs the kit. |
 | `pnpm build` | `tsc` builds the kit | about 0.8 s |
 | `pnpm check` | Lint, typecheck, test and build in order, then the built command's docs, names and run-scope checks on this repository, stopping at the first failure. It removes the build when it made it. | about 10 to 18 s; 12.1 s and 17.7 s on 2026-11-12, at load averages near 6 and 9 |
 

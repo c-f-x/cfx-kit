@@ -25,6 +25,9 @@ after(async () => {
   assert.deepEqual(leftovers, []);
 });
 
+const FROM_ROOT =
+  "; write a path from the repository's root, or as repo:path for a file in another repository";
+
 const lines = (n: number) => `${Array.from({ length: n }, (_, i) => `line ${i + 1}`).join("\n")}\n`;
 
 test("the path check flags missing paths and stale planned marks", () => {
@@ -40,9 +43,28 @@ test("the path check flags missing paths and stale planned marks", () => {
     pathViolations("sample.md", text, (p) => existing.has(p)),
     [
       'sample.md: docs/design.md exists, so drop its "(planned)"',
-      "sample.md: apps/worker/src/gone.ts does not exist",
+      `sample.md: apps/worker/src/gone.ts does not exist${FROM_ROOT}`,
     ],
   );
+});
+
+const onlyDnsbl = (p: string) => p === "apps/worker/src/mail/dnsbl.ts";
+
+test("a path is read from the repository's root, and another repository's path is written repo:path", () => {
+  const exists = onlyDnsbl;
+  // A path from the root, and paths in other repositories, with and without line numbers.
+  const kept = [
+    "`apps/worker/src/mail/dnsbl.ts`",
+    "`traks:packages/shared/src/queries.ts:202-472`",
+    "`cfanalytics:scripts/ops.mjs`",
+  ].join(", ");
+  assert.deepEqual(pathViolations("AGENTS.md", kept, exists), []);
+  // The same file written from its package folder, and another repository's path with no repo: in front.
+  const flagged = "`mail/dnsbl.ts`, and traks `packages/shared/src/queries.ts:202-472`";
+  assert.deepEqual(pathViolations("AGENTS.md", flagged, exists), [
+    `AGENTS.md: mail/dnsbl.ts does not exist${FROM_ROOT}`,
+    `AGENTS.md: packages/shared/src/queries.ts does not exist${FROM_ROOT}`,
+  ]);
 });
 
 test(`the brief check passes ${BRIEF_MAX_LINES} lines, and flags one more or no brief at all`, () => {
@@ -126,4 +148,30 @@ test("c-f-x check docs passes a sample whose paths all exist", async () => {
   const { code, stdout } = await runCli(["check", "docs"], repo, scope.dir);
   assert.equal(code, 0);
   assert.match(stdout, /check docs: passed/);
+});
+
+test("c-f-x check docs reads a monorepo's paths from the root, and skips other repositories' paths", async () => {
+  const flagged = path.join(scope.dir, "monorepo-flagged");
+  const files = {
+    "AGENTS.md": `Spam checks: \`apps/worker/src/mail/dnsbl.ts\`. Ported from \`cfanalytics:scripts/ops.mjs\`.\n\n${STRATEGY_HEADING}\n`,
+    "CLAUDE.md": `${IMPORT_LINE}\n`,
+    "apps/worker/src/mail/dnsbl.ts": "export {};\n",
+  };
+  writeFiles(flagged, {
+    ...files,
+    "docs/architecture.md": "In `apps/worker/src/`: `mail/dnsbl.ts`.\n",
+  });
+  const bad = await runCli(["check", "docs"], flagged, scope.dir);
+  assert.equal(bad.code, 1);
+  assert.match(
+    bad.stderr,
+    /^docs\/architecture\.md: mail\/dnsbl\.ts does not exist; write a path from the repository's root/m,
+  );
+  assert.match(bad.stderr, /check docs: failed with 1 problem$/m);
+
+  const clean = path.join(scope.dir, "monorepo-clean");
+  writeFiles(clean, files);
+  const good = await runCli(["check", "docs"], clean, scope.dir);
+  assert.equal(good.stderr, "");
+  assert.equal(good.code, 0);
 });

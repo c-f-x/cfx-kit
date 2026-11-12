@@ -23,7 +23,7 @@ const NO_CONTRACT_TEST =
 
 test("the layout check names each missing file, a data model without its table, and no contract test", () => {
   assert.deepEqual(
-    layoutViolations(() => false, false, false),
+    layoutViolations(".", () => false, false, false),
     [
       "wrangler.jsonc is missing",
       "docs/data-model.md is missing",
@@ -33,12 +33,19 @@ test("the layout check names each missing file, a data model without its table, 
     ],
   );
   assert.deepEqual(
-    layoutViolations(() => true, false, true),
+    layoutViolations(".", () => true, false, true),
     ["docs/data-model.md has no lifetimes table"],
   );
   assert.deepEqual(
-    layoutViolations(() => true, true, true),
+    layoutViolations(".", () => true, true, true),
     [],
+  );
+});
+
+test("the layout check looks for wrangler.jsonc in the Worker's folder", () => {
+  assert.deepEqual(
+    layoutViolations("apps/worker", (p) => p !== "apps/worker/wrangler.jsonc", true, true),
+    ["apps/worker/wrangler.jsonc is missing"],
   );
 });
 
@@ -74,8 +81,12 @@ const CONTRACT_TEST = [
   "",
 ].join("\n");
 
+// A tool whose Worker sits at the repository's root: c-f-x.json names no folder for it.
+const ROOT_CONFIG = JSON.stringify({ sources: [], slices: [], migrations: [] });
+
 // The files of sections 1 and 6 that a clean tool keeps.
 const TOOL_FILES = {
+  "c-f-x.json": ROOT_CONFIG,
   "wrangler.jsonc": "{}\n",
   "docs/data-model.md": `# Data model\n\n${LIFETIMES}`,
   "docs/contract.md": "# Contract\n",
@@ -86,6 +97,7 @@ const TOOL_FILES = {
 test("c-f-x check layout fails on a sample that lacks the tool files", async () => {
   const repo = path.join(scope.dir, "flagged");
   writeFiles(repo, {
+    "c-f-x.json": ROOT_CONFIG,
     "wrangler.jsonc": "{}\n",
     "docs/data-model.md": "# Data model\n",
     "docs/spec/notes.md": "Behaviours, some day.\n",
@@ -166,4 +178,73 @@ test("a tool started from templates/tool passes layout, docs and wrangler-config
     assert.equal(code, 0, check);
     assert.match(stdout, new RegExp(`check ${check}: passed`));
   });
+});
+
+test("c-f-x check layout fails without a c-f-x.json to say where the Worker is", async () => {
+  const repo = path.join(scope.dir, "unconfigured");
+  const { "c-f-x.json": _config, ...files } = { ...TOOL_FILES, ...groundFiles("cfx-sample") };
+  writeFiles(repo, files);
+  const { code, stderr } = await runCli(["check", "layout"], repo, scope.dir);
+  assert.equal(code, 1);
+  assert.match(stderr, /c-f-x\.json is missing/);
+  assert.match(stderr, /check layout: failed with 1 problem$/m);
+});
+
+// A monorepo tool, as cfx-mail and cfx-analytics are: the Worker and its tests
+// in apps/worker/, the repository's own files at the root.
+const WORKER = "apps/worker";
+const WORKER_FILES = new Set(["wrangler.jsonc", ".dev.vars.example", "test/health.test.ts"]);
+const MONOREPO_CONFIG = JSON.stringify({
+  sources: [`${WORKER}/src`],
+  slices: [],
+  migrations: [],
+  worker: WORKER,
+});
+
+function monorepo(name: string): Record<string, string> {
+  const files: Record<string, string> = {};
+  for (const [p, text] of Object.entries({ ...TOOL_FILES, ...groundFiles(name) }))
+    files[WORKER_FILES.has(p) ? `${WORKER}/${p}` : p] = text;
+  return {
+    ...files,
+    "c-f-x.json": MONOREPO_CONFIG,
+    [`${WORKER}/src/index.ts`]: "export default {};\n",
+  };
+}
+
+test("a monorepo tool with its Worker in apps/worker passes every check that reads the Worker", async () => {
+  const repo = path.join(scope.dir, "monorepo");
+  writeFiles(repo, monorepo("cfx-sample"));
+  initRepo(repo);
+  const checks = ["layout", "wrangler-config", "architecture", "lifetimes", "docs"];
+  const runs = await Promise.all(checks.map((check) => runCli(["check", check], repo, scope.dir)));
+  runs.forEach(({ code, stdout, stderr }, i) => {
+    const check = checks[i] ?? "";
+    assert.equal(stderr, "", check);
+    assert.equal(code, 0, check);
+    assert.match(stdout, new RegExp(`check ${check}: passed`));
+  });
+});
+
+test("c-f-x check layout reads the Worker's files only in the folder c-f-x.json names", async () => {
+  const repo = path.join(scope.dir, "monorepo-at-root");
+  // c-f-x.json names apps/worker, but the Worker's files sit at the root: no guessing between them.
+  writeFiles(repo, {
+    ...TOOL_FILES,
+    ...groundFiles("cfx-sample"),
+    "c-f-x.json": MONOREPO_CONFIG,
+    [`${WORKER}/src/index.ts`]: "export default {};\n",
+  });
+  const { code, stderr } = await runCli(["check", "layout"], repo, scope.dir);
+  assert.equal(code, 1);
+  assert.match(stderr, /^apps\/worker\/wrangler\.jsonc is missing$/m);
+  assert.match(
+    stderr,
+    /^apps\/worker\/\.dev\.vars\.example is missing: it names the Worker's secrets, exactly those in apps\/worker\/wrangler\.jsonc's secrets\.required$/m,
+  );
+  assert.match(
+    stderr,
+    /^no test runs the health contract: a \*\.test\.ts file under apps\/worker\/ must import checkHealthContract/m,
+  );
+  assert.match(stderr, /check layout: failed with 3 problems/);
 });

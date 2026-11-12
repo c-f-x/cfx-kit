@@ -11,13 +11,14 @@
 **Goal.** Each family rule that `docs/conventions.md` says a check holds fails a tool repository that breaks it. Every check flags a sample it must flag and passes a clean one, and each of its rules was proven red once by a deliberate break in the check's code.
 
 ## Tests
-- [x] (code) the ground rules flag each rule a tool repository breaks, one problem per break · packages/kit/src/checks/ground-rules.test.ts @d850939979342b · by cli
-- [x] (code) the layout check fails a sample that lacks the tool files and the ground-rule files, and passes a full one · packages/kit/src/checks/layout.test.ts @5b93f2b8f369a0 · by cli
+- [x] (code) the ground rules flag each rule a tool repository breaks, one problem per break · packages/kit/src/checks/ground-rules.test.ts @d850939ce4a79b · by cli
+- [x] (code) the layout check fails a sample that lacks the tool files and the ground-rule files, and passes a full one · packages/kit/src/checks/layout.test.ts @5b93f2bbd367c8 · by cli
 - [x] (code) the names check finds research-only names and spares the vendors a tool lists · packages/kit/src/checks/names.test.ts @7ccab3dc72b20f · by cli
-- [x] (code) the docs check holds named paths, the AGENTS.md bound and the one-line CLAUDE.md · packages/kit/src/checks/docs.test.ts @83b756f3fd64bd · by cli
-- [x] (code) the architecture check flags each code-style rule on its sample · packages/kit/src/checks/architecture.test.ts @9f0bc06a71a50d · by cli
+- [x] (code) the docs check holds named paths, the AGENTS.md bound and the one-line CLAUDE.md · packages/kit/src/checks/docs.test.ts @83b756f4be9a84 · by cli
+- [x] (code) the architecture check flags each code-style rule on its sample · packages/kit/src/checks/architecture.test.ts @9f0bc06ce08090 · by cli
 - [x] (code) the kit's own README follows the family's order, and the section order allows only the optional sections to be left out · packages/kit/src/checks/readme.test.ts @322d5e959e97e2 · by cli
-- [x] (code) the wrangler-config check flags ids, hostnames, secrets, a written-in jurisdiction and a secrets.required that differs from .dev.vars.example · packages/kit/src/checks/wrangler-config.test.ts @f04034aeafc2f5 · by cli
+- [x] (code) a monorepo tool with its Worker in apps/worker passes layout, wrangler-config, architecture, lifetimes and docs, and layout reads the Worker's files only in the folder c-f-x.json names · packages/kit/src/checks/layout.test.ts @a8115f3bd367c8 · by cli
+- [x] (code) the wrangler-config check flags ids, hostnames, secrets, a written-in jurisdiction and a secrets.required that differs from .dev.vars.example · packages/kit/src/checks/wrangler-config.test.ts @f04034ad6dc67f · by cli
 
 ## Needs #cfx-kit
 ## For #cfx-kit-persona
@@ -25,5 +26,6 @@
 - 2026-11-11 shaped from the ground rules ruling (D-8). The AGENTS.md and CLAUDE.md rules sit in the docs check, which every repository runs, so a tool does not get the same problem twice from docs and layout.
 - 2026-11-12 where data is stored became the site file's choice (D-10): the EU rule in wrangler-config and architecture was replaced by "no literal jurisdiction", in its own commit. Each new rule was red before its code, and a deliberate break of each rule's code turned its test red.
 - 2026-11-12 the repository standard (D-11): the README's order, the AGENTS.md install guide, the skill's format and the files every tool keeps moved into layout, and secrets.required into wrangler-config. The clean ground-rules sample is now built from templates/tool/, so the templates are proven by the same test. A missing Install section is reported once, by the section order, so one cause gives one problem.
+- 2026-11-12 the Worker's folder (cfx-kit#8): both tools keep their Worker in apps/worker/, so c-f-x.json gained an optional "worker", and layout, wrangler-config, architecture, lifetimes and the ground rules read wrangler.jsonc, .dev.vars.example, .dev.vars and the contract test only there. Left out, it is the root; there is no search between places. layout and wrangler-config now need c-f-x.json. For paths in docs the rule is "from the root": resolving a path against the package folders would pass src/index.ts whichever package it meant. Each new test was red before its code, and a deliberate break of each read (nine in all) turned its test red.
 </script>
 <script src="loop.js"></script>
