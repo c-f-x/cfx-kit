@@ -31,7 +31,7 @@ Every problem names the file and the rule. The rules are written once, in `docs/
 | `architecture` | pure code does I/O, parts reach into each other, or scheduled work runs outside `job` |
 | `lifetimes` | a store has no written rule for what it keeps and what removes the rest |
 | `migrations` | a schema step that already ran was edited |
-| `wrangler-config` | the Wrangler config holds an id, a real hostname, an email address or a secret |
+| `wrangler-config` | the Wrangler config holds an id, a real hostname, an email address, a secret or a jurisdiction |
 | `run-scope` | the test run leaves a file or a process behind |
 
 Each check is tested on a sample repository it must flag and one it must pass.

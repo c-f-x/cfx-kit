@@ -1,5 +1,4 @@
 import path from "node:path";
-import { readLifetimes } from "./lifetimes.ts";
 import {
   importsOf,
   readSources,
@@ -8,13 +7,7 @@ import {
   sourceFiles,
   withoutComments,
 } from "./source.ts";
-import {
-  type DurableObjectBinding,
-  durableObjectBindings,
-  emailBindings,
-  readToolConfig,
-  readWrangler,
-} from "./tool-config.ts";
+import { emailBindings, readToolConfig, readWrangler } from "./tool-config.ts";
 import type { Check } from "./types.ts";
 
 // `c-f-x check architecture`: the code rules no linter knows. Each function
@@ -268,50 +261,30 @@ export function scheduledWorkViolations(sources: Source[]): string[] {
   return found;
 }
 
-const MAKES_ID = /\.\s*(idFromName|idFromString|newUniqueId|getByName)\s*\(/g;
-const IN_EU = /\.\s*jurisdiction\(\s*["']eu["']\s*\)\s*$/;
-const LAST_NAME = /([A-Za-z_$][\w$]*)\s*$/;
+// A call of `.jurisdiction(` whose argument is a string written into the code.
+const LITERAL_JURISDICTION = /\.\s*jurisdiction\(\s*(["'`])([^"'`$]*)\1\s*\)/g;
 
 /**
- * Every Durable Object that holds data is addressed in the `eu` jurisdiction:
- * each call that makes an object id is made on `.jurisdiction("eu")`. Wrangler's
- * config cannot set a Durable Object's jurisdiction, so the code must. A
- * namespace whose class keeps nothing (`keepsNothing`, binding names) may be
- * addressed anywhere, for example to run where a location hint asks.
+ * No Durable Object's jurisdiction is written into the code. Where data is
+ * stored is each installation's choice, in its site file, and the deploy hands
+ * it to the Worker (conventions, section 5). So a call of `.jurisdiction(` reads
+ * its value from configuration.
  */
-export function durableObjectJurisdictionViolations(
-  sources: Source[],
-  keepsNothing: string[],
-): string[] {
+export function durableObjectJurisdictionViolations(sources: Source[]): string[] {
   const found: string[] = [];
   for (const { file, text } of sources) {
-    const code = withoutComments(text);
-    for (const m of code.matchAll(MAKES_ID)) {
-      const before = code.slice(0, m.index);
-      if (IN_EU.test(before)) continue;
-      const receiver = LAST_NAME.exec(before)?.[1];
-      if (receiver !== undefined && keepsNothing.includes(receiver)) continue;
-      found.push(`${file} makes a Durable Object id outside the eu jurisdiction (${m[1]})`);
-    }
+    for (const m of withoutComments(text).matchAll(LITERAL_JURISDICTION))
+      found.push(
+        `${file} writes the jurisdiction "${m[2] ?? ""}" into the code; read it from configuration, the site file's jurisdiction`,
+      );
   }
   return found;
-}
-
-/** The binding names of the Durable Object classes whose lifetimes row says they hold `nothing`. */
-export function bindingsThatKeepNothing(
-  bindings: DurableObjectBinding[],
-  rows: { store: string; holds: string }[],
-): string[] {
-  const empty = new Set(
-    rows.filter((r) => r.holds.trim().toLowerCase() === "nothing").map((r) => r.store),
-  );
-  return bindings.filter((b) => empty.has(b.className)).map((b) => b.name);
 }
 
 export const architecture: Check = {
   name: "architecture",
   summary:
-    "core/ is pure, slices meet through index.ts, no module state, one mail.ts, scheduled work through job, Durable Objects in the eu",
+    "core/ is pure, slices meet through index.ts, no module state, one mail.ts, scheduled work through job, no jurisdiction written into the code",
   async run({ root }) {
     const config = readToolConfig(root);
     const wrangler = readWrangler(root);
@@ -319,20 +292,13 @@ export const architecture: Check = {
       return [config, wrangler].flatMap((read) => (read.ok ? [] : read.problems));
     const files = [...new Set(config.value.sources.flatMap((dir) => sourceFiles(root, dir)))];
     const sources = readSources(root, files);
-    // Without a lifetimes table, no class is known to keep nothing, so every
-    // Durable Object must be in the eu. The lifetimes check reports the table.
-    const table = readLifetimes(root);
-    const keepsNothing = bindingsThatKeepNothing(
-      durableObjectBindings(wrangler.value),
-      table.ok ? table.value.rows : [],
-    );
     return [
       ...coreViolations(sources),
       ...crossSliceViolations(sources, config.value.slices),
       ...moduleStateViolations(sources),
       ...mailViolations(sources, emailBindings(wrangler.value)),
       ...scheduledWorkViolations(sources),
-      ...durableObjectJurisdictionViolations(sources, keepsNothing),
+      ...durableObjectJurisdictionViolations(sources),
     ];
   },
 };

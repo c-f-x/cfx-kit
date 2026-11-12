@@ -52,7 +52,7 @@ Side effects stay at the edge, dependencies are passed in, failures live in the 
 - Each slice owns its SQL. Nothing holds this yet: cfanalytics' check names its own files, and the general form is still to be written.
 - Scheduled work runs only through the kit's `job` (section 6).
 - There is no module-level mutable state: no top-level `let` or `var`, and no top-level `Map`, `Set` or `Array` made with `new`.
-- Every Durable Object that holds data is addressed in the `eu` jurisdiction (section 5). Wrangler's config cannot set a Durable Object's jurisdiction, so the code must: every call that makes an object id (`idFromName`, `idFromString`, `newUniqueId`, `getByName`) is made on `.jurisdiction("eu")`. A class whose lifetimes row says it holds `nothing` is exempt, so that it can run where a location hint asks.
+- No jurisdiction is written into the code. Where data is stored is each installation's choice, in its site file (section 5). Wrangler's config cannot set a Durable Object's jurisdiction, so the code does: when the site names one, the Worker reads it from the var `JURISDICTION`, which the deploy sets from the site file, and makes its object ids on `.jurisdiction(env.JURISDICTION)`. The check fails on a `.jurisdiction(` call given a string written into the code. It cannot see whether every id that holds data goes through the site's value.
 - No promise is left unawaited. This is held by oxlint `typescript/no-floating-promises` in type-aware mode, plus strict TypeScript with `noUncheckedIndexedAccess`.
 - Each check that reads source text also runs on a sample it must flag.
 
@@ -92,7 +92,8 @@ Each site file is validated by a zod schema exported from `@c-f-x/kit`, `siteSch
 - `account_id`: the Cloudflare account, 32 lower-case hex characters;
 - `hostnames`: the tool's hostnames by role, at least one, for example `{ "admin": "status.example.com" }`;
 - `admin_emails`: who may sign in as an admin (section 8), at least one;
-- `alert_addresses`: who the tool's alerts and notices go to, at least one. Each must also be in the tool's `send_email` allowlist.
+- `alert_addresses`: who the tool's alerts and notices go to, at least one. Each must also be in the tool's `send_email` allowlist;
+- `jurisdiction`: where the installation keeps its data (section 5). Left out, Cloudflare places it; `"eu"` keeps it in the EU.
 
 A tool adds its own fields with `siteSchema.extend({...})`. `loadSiteFile(tool, schema, site)` reads `<tool>.jsonc` from the folder `site` names, the value of `CFX_SITE`, parses it as JSONC and checks it. It never throws. It answers the value, or the problems, each naming the file and the field that is wrong. The kit's test is `packages/kit/src/site.test.ts`. A wrong or missing value stops the deploy before any step runs. Nothing holds that yet: no tool's deploy loads its site file through the kit so far.
 
@@ -100,10 +101,10 @@ A tool adds its own fields with `siteSchema.extend({...})`. `loadSiteFile(tool, 
 - an account id or zone id, and any value shaped like a resource id (a UUID or 32 hex characters);
 - a real hostname in a URL, a route or a `vars` value, and any email address. Only `example.com` and the names under it are allowed;
 - a secret: a value under a key named like a credential (secret, token, password, API key, private key), or the name of any secret the tool lists in `tool:.dev.vars.example`. Wrangler's `secrets.required` list may name them, because it holds no values;
-- a D1 database or R2 bucket, in any block, without `"jurisdiction": "eu"`;
+- a key named `jurisdiction`, in any block. Where data is stored is the site file's value (section 5), which the deploy joins into the config it generates;
 - a `.dev.vars` file that git does not ignore.
 
-A `vars` block is allowed, and its values are checked like every other value. A Durable Object's jurisdiction is set in code, so `c-f-x check architecture` holds it (section 2).
+A `vars` block is allowed, and its values are checked like every other value. A Durable Object's jurisdiction is set in code, so `c-f-x check architecture` holds that no literal one is written there (section 2). Nothing holds yet that a deploy joins the site's jurisdiction in: no tool's deploy loads its site file through the kit so far.
 
 ## 5. Data stores and their lifetimes
 
@@ -122,10 +123,12 @@ For example:
 | `Prober` | nothing | none | nothing |
 | `results` | one row per check run | 30 days | the daily sweep |
 
-Where data lives:
-- Per-project data that grows (errors, results) goes in a SQLite Durable Object in the `eu` jurisdiction, as in cfanalytics. Cloudflare's page says Workers "may still access Durable Objects constrained to a jurisdiction from anywhere in the world", and that the object id "will be logged outside of the specified jurisdiction for billing and debugging purposes" (developers.cloudflare.com/durable-objects/reference/data-location/).
-- Small shared registries (projects, keys, pages) and modest time series go in D1, created with `--jurisdiction=eu`. Cloudflare says "Jurisdictions can only be set on database creation and cannot be added or updated after the database exists" (developers.cloudflare.com/d1/configuration/data-location/, read 2026-11-11). So `install` must set the jurisdiction when it creates the database. The D1 size limit is 10 GB on Workers Paid (developers.cloudflare.com/d1/platform/limits/).
-- Blobs go in R2 in the `eu` jurisdiction. Each bucket also gets a lifecycle rule as a backstop. Cloudflare says objects "will typically be removed from a bucket within 24 hours" of expiry (developers.cloudflare.com/r2/buckets/object-lifecycles/).
+Where data is stored is a choice each installation makes once, in its site file's `jurisdiction` (section 4): left out, which is the default, Cloudflare places the data; `"eu"` keeps it in the EU. A tool may have users anywhere, so no tool fixes a region (owner, 2026-11-12, D-10). The public `wrangler.jsonc` names no jurisdiction. The deploy joins the site's value into each D1 and R2 binding of the config it generates, and into the var `JURISDICTION` that Durable Object code reads (section 2). Cloudflare says "Jurisdictions can only be set on database creation and cannot be added or updated after the database exists" (developers.cloudflare.com/d1/configuration/data-location/, read 2026-11-11). So `install` sets the jurisdiction when it creates each store, and a deployment keeps the jurisdiction it was created with: the owner's deployments made in the EU stay there, and their site files say `"eu"`.
+
+What goes where:
+- Per-project data that grows (errors, results) goes in a SQLite Durable Object, as in cfanalytics. Cloudflare's page says Workers "may still access Durable Objects constrained to a jurisdiction from anywhere in the world", and that the object id "will be logged outside of the specified jurisdiction for billing and debugging purposes" (developers.cloudflare.com/durable-objects/reference/data-location/).
+- Small shared registries (projects, keys, pages) and modest time series go in D1. The D1 size limit is 10 GB on Workers Paid (developers.cloudflare.com/d1/platform/limits/).
+- Blobs go in R2. Each bucket also gets a lifecycle rule as a backstop. Cloudflare says objects "will typically be removed from a bucket within 24 hours" of expiry (developers.cloudflare.com/r2/buckets/object-lifecycles/).
 
 Each tool runs one daily sweep, which logs `sweep_done` with counts per store.
 
@@ -186,9 +189,9 @@ Every tool runs on one Cloudflare account on Workers Paid. Cloudflare charges a 
 
 A person needs a Cloudflare account on Workers Paid and one zone.
 
-The quick path is Cloudflare's deploy button in each tool's README. Cloudflare "clones your source repository into the user's GitHub/GitLab account". It provisions the resources the Wrangler config asks for, including "KV namespaces, D1 databases, R2 buckets" and "Durable Objects" (developers.cloudflare.com/workers/platform/deploy-buttons/, read 2026-11-11). Worker secrets are named in `.dev.vars.example`. The page does not say whether the button can set a jurisdiction. Check that before a README offers the button. If it cannot, the README must say that data then sits wherever Cloudflare places it.
+The quick path is Cloudflare's deploy button in each tool's README. Cloudflare "clones your source repository into the user's GitHub/GitLab account". It provisions the resources the Wrangler config asks for, including "KV namespaces, D1 databases, R2 buckets" and "Durable Objects" (developers.cloudflare.com/workers/platform/deploy-buttons/, read 2026-11-11). Worker secrets are named in `.dev.vars.example`.
 
-The maintained path is `pnpm ops <tool> install` with a site file written from `site.example.jsonc`. Its plan creates the stores in the `eu` jurisdiction, puts the secrets (drawn and piped, never printed), deploys and waits for health. `uninstall` lists everything it will delete and needs `--go`.
+The maintained path is `pnpm ops <tool> install` with a site file written from `site.example.jsonc`. Its plan creates the stores in the site file's jurisdiction (section 5), puts the secrets (drawn and piped, never printed), deploys and waits for health. `uninstall` lists everything it will delete and needs `--go`.
 
 **Checks:**
 - An install test runs `install`, `health` and `uninstall` against local Workers with a throwaway site file, and expects nothing to be left behind (section 12).

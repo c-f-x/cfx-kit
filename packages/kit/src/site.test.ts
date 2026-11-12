@@ -81,6 +81,30 @@ test("a missing field and a file that is not JSONC are named", () => {
   });
 });
 
+test("where data is stored is the site's choice: no jurisdiction, or the eu", () => {
+  const eu = parseSiteFile(
+    "cfx-sample.jsonc",
+    SITE.replace(/}\s*$/, '  "jurisdiction": "eu",\n}\n'),
+    siteSchema,
+  );
+  assert.equal(eu.ok && eu.value.jurisdiction, "eu");
+  const placed = parseSiteFile("cfx-sample.jsonc", SITE, siteSchema);
+  assert.equal(placed.ok && placed.value.jurisdiction, undefined);
+  assert.deepEqual(
+    parseSiteFile(
+      "cfx-sample.jsonc",
+      SITE.replace(/}\s*$/, '  "jurisdiction": "us",\n}\n'),
+      siteSchema,
+    ),
+    {
+      ok: false,
+      problems: [
+        'cfx-sample.jsonc: jurisdiction: leave it out for Cloudflare\'s default placement, or say "eu"',
+      ],
+    },
+  );
+});
+
 test("a tool extends the schema with fields of its own, and they are checked too", () => {
   const status = siteSchema.extend({ probe_regions: z.array(z.enum(["weur", "enam"])).min(1) });
   const text = SITE.replace(/}\s*$/, '  "probe_regions": ["weur", "mars"],\n}\n');

@@ -68,12 +68,12 @@ A tool runs these from its own folder, with `docs` and `run-scope` above. Each r
 
 | Command | Holds (conventions section) |
 |---|---|
-| `c-f-x check architecture` | `core/` is pure, slices meet through `index.ts`, no module state, one `mail.ts`, scheduled work only through `job`, Durable Objects in the eu (2, 5, 6, 9) |
+| `c-f-x check architecture` | `core/` is pure, slices meet through `index.ts`, no module state, one `mail.ts`, scheduled work only through `job`, no jurisdiction written into the code (2, 5, 6, 9) |
 | `c-f-x check layout` | The files every tool keeps, a test that runs the health contract, and the ground rules (1, 6, 16) |
 | `c-f-x check names` | No research-only vendor names in tracked files (14). The kit runs it on itself too. |
 | `c-f-x check lifetimes` | Every binding and table has a lifetimes row (5) |
 | `c-f-x check migrations` | No applied schema step changes (5). `c-f-x lock-migrations` locks new steps. |
-| `c-f-x check wrangler-config` | No ids, real hostnames, email addresses or secrets in `wrangler.jsonc`, and D1 and R2 in the eu (4) |
+| `c-f-x check wrangler-config` | No ids, real hostnames, email addresses, secrets or jurisdiction in `wrangler.jsonc` (4, 5) |
 
 Each check's test builds a sample tool repository it must flag and one it must pass, inside the test's run scope.
 

@@ -93,3 +93,13 @@ The decision log of the c-f-x family. One entry per decision. A decision is neve
 **Decision.** Every tool is named `cfx-<job>`: cfx-status, cfx-mail, cfx-analytics. This repository is `c-f-x/cfx-kit`. The brand, the org, the npm scope (`@c-f-x/kit`, `@c-f-x/ui`) and the domain stay c-f-x, as D-1 set. Key prefixes (`cfs_sk_` and the like) are unchanged.
 
 **Consequences.** This supersedes D-1's tool-name rule; the rest of D-1 stands. The repositories were renamed on GitHub, which redirects the old URLs. The CI runner is labelled after the new name. Entries above keep their original words.
+
+## D-10 · Each installation chooses where its data is stored · accepted (2026-11-12)
+
+**Made by.** The owner. In the owner's words: "we cant really limit data just to EU - we might have US users using our tools etc.... so Im not sure why that is a 'thing' really?". The rule it replaces, every store in the EU, was an agent's proposal, never the owner's ruling.
+
+**Context.** The conventions required every D1 database, R2 bucket and Durable Object to sit in Cloudflare's `eu` jurisdiction, and two checks held it. Someone who installs a tool for users elsewhere had no way to choose.
+
+**Decision.** Where data is stored is a choice each installation makes once, in its site file: a `jurisdiction` field, left out for Cloudflare's default placement, or `"eu"`. Left out is the default. The public `wrangler.jsonc` names no jurisdiction, and Durable Object code reads the site's value from configuration. The lead chose how it is held: `c-f-x check wrangler-config` fails on a `jurisdiction` key in the config, and `c-f-x check architecture` on a `.jurisdiction(` call given a string written into the code.
+
+**Consequences.** A deploy joins the site's jurisdiction into the config it generates. Cloudflare cannot change a store's jurisdiction after it is made, so a deployment keeps the one it was created with: the owner's deployments made in the EU stay there, and their site files say `"eu"`. The install command creates stores in the site file's jurisdiction. `docs/conventions.md` sections 2, 4, 5 and 11 say so.

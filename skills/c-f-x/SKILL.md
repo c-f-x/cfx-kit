@@ -18,10 +18,10 @@ Run each from the tool repository's own folder. Exit 0 passes, 1 fails with one 
 | `c-f-x check docs` | a doc names a path that does not exist, `AGENTS.md` is missing, longer than 150 lines or has no `## Test strategy`, or `CLAUDE.md` holds anything but `@AGENTS.md` |
 | `c-f-x check names` | a tracked file names a vendor known only from research |
 | `c-f-x check layout` | a file every tool keeps is missing, no test runs the health contract, or a ground rule is broken: the skill, the three ways to install, the public files, the weeder and petals jobs, the tend map, the landing page |
-| `c-f-x check architecture` | `core/` does I/O, slices reach into each other, module state, mail sent outside one `mail.ts`, scheduled work outside `job`, a Durable Object outside the eu |
+| `c-f-x check architecture` | `core/` does I/O, slices reach into each other, module state, mail sent outside one `mail.ts`, scheduled work outside `job`, a jurisdiction written into the code |
 | `c-f-x check lifetimes` | a binding or table in `wrangler.jsonc` or the migrations has no row in `docs/data-model.md` |
 | `c-f-x check migrations` | an applied schema step changed. `c-f-x lock-migrations` locks new steps. |
-| `c-f-x check wrangler-config` | `wrangler.jsonc` holds an id, a real hostname, an email address or a secret, or binds D1 or R2 outside the eu |
+| `c-f-x check wrangler-config` | `wrangler.jsonc` holds an id, a real hostname, an email address, a secret or a jurisdiction. Where data is stored is the site file's `jurisdiction`. |
 | `c-f-x check run-scope` | `pnpm test` leaves a file, a repository file or a process behind |
 
 `c-f-x.json` at the tool's root tells the checks where its code is: `{ "sources": ["src"], "slices": ["src/features"], "migrations": ["migrations"] }`. Add `"vendors": [...]` for the vendors the tool integrates, whose names its public text may use. Never add a name to `vendors` to silence `names` when the tool does not use that vendor's code or SDK; reword the text instead.
@@ -63,7 +63,7 @@ From `@c-f-x/kit/worker`, which a Worker can bundle:
 
 ## The site file
 
-The public repository holds no account id, hostname or email address. Those live in a private site folder named by `CFX_SITE`, one `<tool>.jsonc` per tool, checked by `loadSiteFile(tool, siteSchema.extend({...}), process.env.CFX_SITE)`. It answers the value or the problems, never a throw. Write a `site.example.jsonc` with `example.com` values for other people.
+The public repository holds no account id, hostname or email address. Those live in a private site folder named by `CFX_SITE`, one `<tool>.jsonc` per tool, checked by `loadSiteFile(tool, siteSchema.extend({...}), process.env.CFX_SITE)`. It answers the value or the problems, never a throw. Write a `site.example.jsonc` with `example.com` values for other people. The site file's optional `jurisdiction` says where the installation keeps its data: left out for Cloudflare's placement, or `"eu"`. Never write a jurisdiction into `wrangler.jsonc` or the code: the deploy joins the site's value into the generated config, and Durable Object code reads it from the var `JURISDICTION`.
 
 ## What needs the owner
 

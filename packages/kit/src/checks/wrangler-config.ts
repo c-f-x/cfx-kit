@@ -1,20 +1,13 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import {
-  configBlocks,
-  entries,
-  isRecord,
-  readWrangler,
-  WRANGLER,
-  type Wrangler,
-} from "./tool-config.ts";
+import { isRecord, readWrangler, WRANGLER, type Wrangler } from "./tool-config.ts";
 import type { Check } from "./types.ts";
 
 // `c-f-x check wrangler-config`: the template `wrangler.jsonc` in a public
-// repository holds no deployment value and no secret, and binds its data in
-// the eu. Deployment values live in the private site file (docs/conventions.md,
-// section 4). Merged from cfanalytics:scripts/wrangler-config.test.mjs,
+// repository holds no deployment value, no secret and no jurisdiction.
+// Deployment values, where data is stored among them, live in the private site
+// file (docs/conventions.md, sections 4 and 5). Merged from cfanalytics:scripts/wrangler-config.test.mjs,
 // cfanalytics:scripts/lib/wrangler-config.mjs and cfmail:scripts/wrangler-config.test.mjs.
 // Both forbid a `vars` block, because each keeps its settings elsewhere; the
 // family rule is narrower, so here `vars` may stay and its values are checked
@@ -129,23 +122,19 @@ export function secretViolations(config: Wrangler, secretNames: string[]): strin
   return found;
 }
 
-/** D1 databases and R2 buckets, in every block, bound in the eu jurisdiction. */
-export function jurisdictionViolations(config: Wrangler): string[] {
-  const found: string[] = [];
-  for (const [name, block] of configBlocks(config)) {
-    for (const [key, label] of [
-      ["d1_databases", "D1 database"],
-      ["r2_buckets", "R2 bucket"],
-    ] as const) {
-      for (const store of entries(block, key)) {
-        if (store.jurisdiction !== "eu")
-          found.push(
-            `${name}: the ${label} ${String(store.binding)} is not in the eu jurisdiction`,
-          );
-      }
-    }
-  }
-  return found;
+/**
+ * A jurisdiction written into the config, under any key of that name in any
+ * block. Where data is stored is each installation's choice, in its site file,
+ * and the deploy joins it into the config it generates (docs/conventions.md,
+ * section 5).
+ */
+export function literalJurisdictionViolations(config: Wrangler): string[] {
+  return walk(config)
+    .keys.filter(({ key }) => key.toLowerCase() === "jurisdiction")
+    .map(
+      ({ at }) =>
+        `${at} hard-codes a jurisdiction; the deploy takes it from the site file's jurisdiction field`,
+    );
 }
 
 /** The secret names a `.dev.vars.example` lists, one `NAME=` per line. */
@@ -173,7 +162,7 @@ function ignoredByGit(root: string, file: string): boolean | null {
 
 export const wranglerConfig: Check = {
   name: "wrangler-config",
-  summary: `${WRANGLER} holds no ids, real hostnames, email addresses or secrets, and binds data in the eu`,
+  summary: `${WRANGLER} holds no ids, real hostnames, email addresses or secrets, and writes in no jurisdiction`,
   async run({ root }) {
     const config = readWrangler(root);
     if (!config.ok) return config.problems;
@@ -182,7 +171,7 @@ export const wranglerConfig: Check = {
     const problems = [
       ...deploymentValueViolations(config.value),
       ...secretViolations(config.value, secretNames),
-      ...jurisdictionViolations(config.value),
+      ...literalJurisdictionViolations(config.value),
     ].map((p) => `${WRANGLER}: ${p}`);
     const ignored = ignoredByGit(root, DEV_VARS);
     if (ignored === null)

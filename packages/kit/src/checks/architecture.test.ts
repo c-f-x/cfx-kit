@@ -4,7 +4,6 @@ import { after, before, test } from "node:test";
 import { openRunScope, type RunScope } from "../run-scope.ts";
 import { runCli, writeFiles } from "../test-support/cli.ts";
 import {
-  bindingsThatKeepNothing,
   coreViolations,
   crossSliceViolations,
   durableObjectJurisdictionViolations,
@@ -206,35 +205,21 @@ test("the scheduled-work check flags work a scheduled handler or an alarm runs o
   ]);
 });
 
-test("the Durable Object check flags an id made outside the eu, unless its class keeps nothing", () => {
-  const found = durableObjectJurisdictionViolations(
-    [
-      sample("src/store-id.ts", "export const id = (ns, p) => ns.idFromName(p);"),
-      sample("src/other.ts", 'const id = env.STORE.jurisdiction("us").newUniqueId();'),
-      sample("src/named.ts", "const stub = env.STORE.getByName(project);"),
-      // Allowed: the eu, across lines, and a namespace whose class keeps nothing.
-      sample("src/ok.ts", 'const id = env.STORE.jurisdiction("eu")\n  .idFromName(p);'),
-      sample("src/probe.ts", "const id = env.PROBER.idFromName(region);"),
-    ],
-    ["PROBER"],
-  );
-  assert.deepEqual(found, [
-    "src/store-id.ts makes a Durable Object id outside the eu jurisdiction (idFromName)",
-    "src/other.ts makes a Durable Object id outside the eu jurisdiction (newUniqueId)",
-    "src/named.ts makes a Durable Object id outside the eu jurisdiction (getByName)",
+test("the Durable Object check flags a jurisdiction written into the code", () => {
+  const found = durableObjectJurisdictionViolations([
+    sample("src/eu.ts", 'const id = env.STORE.jurisdiction("eu").idFromName(p);'),
+    sample("src/us.ts", "const ns = env.STORE.jurisdiction('fedramp');"),
+    sample("src/split.ts", "const ns = env.STORE\n  .jurisdiction(\n    `eu`\n  );"),
+    // Allowed: the site's jurisdiction, read from configuration, and no jurisdiction at all.
+    sample("src/site.ts", "const ns = env.STORE.jurisdiction(env.JURISDICTION);"),
+    sample("src/plain.ts", "const id = env.PROBER.idFromName(region);"),
+    sample("src/note.ts", '// never write env.STORE.jurisdiction("eu")\nexport {};'),
   ]);
-});
-
-test("a Durable Object class keeps nothing only when its lifetimes row says so", () => {
-  const bindings = [
-    { name: "PROBER", className: "Prober" },
-    { name: "STORE", className: "ProjectStore" },
-  ];
-  const rows = [
-    { store: "Prober", holds: "Nothing" },
-    { store: "ProjectStore", holds: "each project's events" },
-  ];
-  assert.deepEqual(bindingsThatKeepNothing(bindings, rows), ["PROBER"]);
+  assert.deepEqual(found, [
+    'src/eu.ts writes the jurisdiction "eu" into the code; read it from configuration, the site file\'s jurisdiction',
+    'src/us.ts writes the jurisdiction "fedramp" into the code; read it from configuration, the site file\'s jurisdiction',
+    'src/split.ts writes the jurisdiction "eu" into the code; read it from configuration, the site file\'s jurisdiction',
+  ]);
 });
 
 const WRANGLER = JSON.stringify({
@@ -269,7 +254,7 @@ const CLEAN = {
     'import { verdict } from "./features/runs/index.ts";',
     'import { sendAlert } from "./mail.ts";',
     "export const handle = async (env) => {",
-    '  const store = env.STORE.jurisdiction("eu").idFromName("p");',
+    '  const store = env.STORE.jurisdiction(env.JURISDICTION).idFromName("p");',
     '  const probe = env.PROBER.idFromName("weur");',
     "  await sendAlert(env.ALERT, verdict([true]));",
     "};",
@@ -295,7 +280,7 @@ test("c-f-x check architecture fails on a sample that breaks each rule", async (
     "src/features/pages/http.ts": 'import { x } from "../runs/core/verdict.ts";\n',
     "src/features/pages/cache.ts": "let last = null;\n",
     "src/features/pages/notify.ts": "export const tell = (env) => env.ALERT.send({ text: 'x' });\n",
-    "src/store-id.ts": 'export const id = (env) => env.STORE.idFromName("p");\n',
+    "src/store-id.ts": 'export const id = (env) => env.STORE.jurisdiction("eu").idFromName("p");\n',
     "src/cron.ts":
       "export default {\n  async scheduled(c, env) {\n    await sweep(env);\n  },\n};\n",
   });
@@ -306,7 +291,7 @@ test("c-f-x check architecture fails on a sample that breaks each rule", async (
   assert.match(stderr, /src\/features\/pages\/http\.ts imports \.\.\/runs\/core\/verdict\.ts/);
   assert.match(stderr, /src\/features\/pages\/cache\.ts keeps module-level mutable state/);
   assert.match(stderr, /src\/features\/pages\/notify\.ts sends through the email binding ALERT/);
-  assert.match(stderr, /src\/store-id\.ts makes a Durable Object id outside the eu jurisdiction/);
+  assert.match(stderr, /src\/store-id\.ts writes the jurisdiction "eu" into the code/);
   assert.match(stderr, /src\/cron\.ts runs sweep\( in its scheduled handler outside job/);
   assert.match(stderr, /check architecture: failed with 7 problems/);
 });
