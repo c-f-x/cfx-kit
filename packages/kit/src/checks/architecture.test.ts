@@ -313,7 +313,8 @@ test("c-f-x check architecture gives a Durable Object that keeps nothing no exem
   const repo = path.join(scope.dir, "keeps-nothing");
   writeFiles(repo, {
     ...CLEAN,
-    "src/probe-id.ts": 'export const id = (env) => env.PROBER.jurisdiction("eu").idFromName("weur");\n',
+    "src/probe-id.ts":
+      'export const id = (env) => env.PROBER.jurisdiction("eu").idFromName("weur");\n',
   });
   const { code, stderr } = await runCli(["check", "architecture"], repo, scope.dir);
   assert.equal(code, 1);
