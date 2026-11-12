@@ -1,0 +1,6 @@
+# The Worker's secrets, one per line, with no values. They are exactly the
+# names in wrangler.jsonc's secrets.required. Copy this file to .dev.vars for
+# local work; git ignores .dev.vars.
+AUTH_SECRET=
+CLOUDFLARE_CLIENT_ID=
+CLOUDFLARE_CLIENT_SECRET=

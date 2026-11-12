@@ -103,3 +103,23 @@ The decision log of the c-f-x family. One entry per decision. A decision is neve
 **Decision.** For each tag `v<version>`, CI checks that the tag equals the kit's version, runs `pnpm check`, builds the kit, packs it, and attaches the tarball to the tag's GitHub release (`.github/workflows/release.yml`). A tool installs it with `pnpm add -D https://github.com/c-f-x/cfx-kit/releases/download/v<version>/c-f-x-kit-<version>.tgz`. The package keeps `"private": true`.
 
 **Consequences.** This changes how D-2's packages reach the tools; D-2's rest stands. The URL pins the version, so a tool moves to a new one by changing its install line. `packages/kit/src/release.test.ts` packs the kit the same way, installs it into a sample tool and runs its command, and fails when `README.md` or the skill shows another version's line. Publishing to npm stays the owner's step, for when a tool needs it.
+
+## D-11 · Each installation chooses where its data is stored · accepted (2026-11-12)
+
+**Made by.** The owner. In the owner's words: "we cant really limit data just to EU - we might have US users using our tools etc.... so Im not sure why that is a 'thing' really?". The rule it replaces, every store in the EU, was an agent's proposal, never the owner's ruling.
+
+**Context.** The conventions required every D1 database, R2 bucket and Durable Object to sit in Cloudflare's `eu` jurisdiction, and two checks held it. Someone who installs a tool for users elsewhere had no way to choose.
+
+**Decision.** Where data is stored is a choice each installation makes once, in its site file: a `jurisdiction` field, left out for Cloudflare's default placement, or `"eu"`. Left out is the default. The public `wrangler.jsonc` names no jurisdiction, and Durable Object code reads the site's value from configuration. The lead chose how it is held: `c-f-x check wrangler-config` fails on a `jurisdiction` key in the config, and `c-f-x check architecture` on a `.jurisdiction(` call given a string written into the code.
+
+**Consequences.** A deploy joins the site's jurisdiction into the config it generates. Cloudflare cannot change a store's jurisdiction after it is made, so a deployment keeps the one it was created with: the owner's deployments made in the EU stay there, and their site files say `"eu"`. The install command creates stores in the site file's jurisdiction. `docs/conventions.md` sections 2, 4, 5 and 11 say so.
+
+## D-12 · One repository standard for every tool, held by the kit · accepted (2026-11-12)
+
+**Made by.** The owner asked for it. In the owner's words: "the installs should perhaps be as standardised as possible - using common standards for open source projects? to ease setup and installation?", "the readmes should have a very clear structure that we reuse? i think a short intro, and a screenshot should be at the top?", and "how can we add all these points to the kit, so that agents will follow them?". The lead chose the standard and how it is checked.
+
+**Context.** Each tool's README ordered its parts differently. cfx-analytics had no install guide for agents, and no tool shipped a skill another person's agent could install. The research behind the choices is `cfos:docs/research/install-standards.md`: standard-readme for the order, the Agent Skills format for the skill, and GitHub's community files.
+
+**Decision.** Every tool's README follows one order, with a bold line, a short intro, a screenshot and the shortest example at the top. Its `AGENTS.md` holds `## Install and set up` with fixed parts. Its skill follows the Agent Skills format and links the install guide. Every tool keeps the same files, and its `wrangler.jsonc` lists its secrets in `secrets.required`, as `.dev.vars.example` does. The install command has one contract. The deploy button waits until a scratch-account test passes and the tool needs no site values the button cannot set. `docs/conventions.md` section 11 and section 16 rules 2 to 4 say so, and `templates/tool/` holds the files a new tool copies.
+
+**Consequences.** `c-f-x check layout` holds the README, the install guide, the skill and the files, and `c-f-x check wrangler-config` holds `secrets.required`. Section 16's former rule 3, three ways to install with the deploy button first, is replaced. cfx-analytics and cfx-mail do not meet the standard yet; the lead files the work in their repositories.

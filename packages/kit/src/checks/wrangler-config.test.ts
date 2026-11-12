@@ -6,7 +6,8 @@ import { runCli, writeFiles } from "../test-support/cli.ts";
 import { initRepo } from "../test-support/git.ts";
 import {
   deploymentValueViolations,
-  jurisdictionViolations,
+  literalJurisdictionViolations,
+  requiredSecretViolations,
   secretNamesOf,
   secretViolations,
 } from "./wrangler-config.ts";
@@ -76,10 +77,11 @@ test("the secrets check flags credential-named keys and the tool's own secret na
   ]);
 });
 
-test("the jurisdiction check flags a D1 database or R2 bucket outside the eu", () => {
-  const found = jurisdictionViolations({
+test("the jurisdiction check flags a jurisdiction written into the config, in any block", () => {
+  const found = literalJurisdictionViolations({
     d1_databases: [{ binding: "DB", jurisdiction: "eu" }],
     r2_buckets: [{ binding: "BLOBS" }],
+    vars: { JURISDICTION: "eu" },
     env: {
       prod: {
         d1_databases: [{ binding: "DB" }],
@@ -88,24 +90,46 @@ test("the jurisdiction check flags a D1 database or R2 bucket outside the eu", (
     },
   });
   assert.deepEqual(found, [
-    "top level: the R2 bucket BLOBS is not in the eu jurisdiction",
-    "env.prod: the D1 database DB is not in the eu jurisdiction",
-    "env.prod: the R2 bucket BLOBS is not in the eu jurisdiction",
+    "d1_databases[0].jurisdiction hard-codes a jurisdiction; the deploy takes it from the site file's jurisdiction field",
+    "vars.JURISDICTION hard-codes a jurisdiction; the deploy takes it from the site file's jurisdiction field",
+    "env.prod.r2_buckets[0].jurisdiction hard-codes a jurisdiction; the deploy takes it from the site file's jurisdiction field",
   ]);
+});
+
+test("every block declares secrets.required, naming exactly the secrets of .dev.vars.example", () => {
+  const found = requiredSecretViolations(
+    {
+      secrets: { required: ["AUTH_SECRET", "OLD_KEY"] },
+      env: {
+        // Wrangler does not inherit secrets from the top level.
+        prod: {},
+        demo: { secrets: { required: ["AUTH_SECRET", "SESSION_KEY"] } },
+        bare: { secrets: { required: "AUTH_SECRET" } },
+      },
+    },
+    ["AUTH_SECRET", "SESSION_KEY"],
+  );
+  assert.deepEqual(found, [
+    "top level: secrets.required names OLD_KEY, which .dev.vars.example does not",
+    "top level: .dev.vars.example names SESSION_KEY, which secrets.required does not",
+    "env.prod declares no secrets.required: list the Worker's secrets there, [] when it has none; Wrangler does not inherit it from the top level",
+    "env.bare declares no secrets.required: list the Worker's secrets there, [] when it has none; Wrangler does not inherit it from the top level",
+  ]);
+  assert.deepEqual(requiredSecretViolations({ secrets: { required: [] } }, []), []);
 });
 
 const CLEAN_WRANGLER = `{
   // The template: deployment values come from the site file.
   "name": "cfx-sample",
   "main": "src/index.ts",
-  "d1_databases": [{ "binding": "DB", "database_name": "cfx-sample", "jurisdiction": "eu" }],
-  "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "cfx-sample", "jurisdiction": "eu" },],
+  "d1_databases": [{ "binding": "DB", "database_name": "cfx-sample" }],
+  "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "cfx-sample" },],
   "routes": [{ "pattern": "status.example.com", "custom_domain": true }],
   "secrets": { "required": ["AUTH_SECRET"] },
 }
 `;
 
-test("c-f-x check wrangler-config fails on a sample with deployment values, a secret and data outside the eu", async () => {
+test("c-f-x check wrangler-config fails on a sample with deployment values, a secret and a written-in jurisdiction", async () => {
   const repo = path.join(scope.dir, "flagged");
   writeFiles(repo, {
     "wrangler.jsonc": `{
@@ -113,8 +137,8 @@ test("c-f-x check wrangler-config fails on a sample with deployment values, a se
       "account_id": "${ACCOUNT}",
       "vars": { "AUTH_SECRET": "x" },
       "routes": [{ "pattern": "status.tool.test", "custom_domain": true }],
-      "d1_databases": [{ "binding": "DB", "database_id": "${DATABASE}", "jurisdiction": "eu" }],
-      "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "cfx-sample" }]
+      "d1_databases": [{ "binding": "DB", "database_id": "${DATABASE}" }],
+      "r2_buckets": [{ "binding": "BLOBS", "bucket_name": "cfx-sample", "jurisdiction": "eu" }]
     }`,
     ".dev.vars.example": "AUTH_SECRET=\n",
   });
@@ -129,12 +153,10 @@ test("c-f-x check wrangler-config fails on a sample with deployment values, a se
   assert.match(stderr, /wrangler\.jsonc: d1_databases\[0\]\.database_id holds a resource id/);
   assert.match(stderr, /wrangler\.jsonc: vars\.AUTH_SECRET holds a secret/);
   assert.match(stderr, /wrangler\.jsonc: vars\.AUTH_SECRET names the secret AUTH_SECRET/);
-  assert.match(
-    stderr,
-    /wrangler\.jsonc: top level: the R2 bucket BLOBS is not in the eu jurisdiction/,
-  );
+  assert.match(stderr, /wrangler\.jsonc: r2_buckets\[0\]\.jurisdiction hard-codes a jurisdiction/);
+  assert.match(stderr, /wrangler\.jsonc: top level declares no secrets\.required/);
   assert.match(stderr, /\.dev\.vars is not ignored by git/);
-  assert.match(stderr, /check wrangler-config: failed with 7 problems/);
+  assert.match(stderr, /check wrangler-config: failed with 8 problems/);
 });
 
 test("c-f-x check wrangler-config passes a template with only example values", async () => {

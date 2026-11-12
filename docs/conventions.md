@@ -52,7 +52,7 @@ Side effects stay at the edge, dependencies are passed in, failures live in the 
 - Each slice owns its SQL. Nothing holds this yet: cfanalytics' check names its own files, and the general form is still to be written.
 - Scheduled work runs only through the kit's `job` (section 6).
 - There is no module-level mutable state: no top-level `let` or `var`, and no top-level `Map`, `Set` or `Array` made with `new`.
-- Every Durable Object that holds data is addressed in the `eu` jurisdiction (section 5). Wrangler's config cannot set a Durable Object's jurisdiction, so the code must: every call that makes an object id (`idFromName`, `idFromString`, `newUniqueId`, `getByName`) is made on `.jurisdiction("eu")`. A class whose lifetimes row says it holds `nothing` is exempt, so that it can run where a location hint asks.
+- No jurisdiction is written into the code. Where data is stored is each installation's choice, in its site file (section 5). Wrangler's config cannot set a Durable Object's jurisdiction, so the code does: when the site names one, the Worker reads it from the var `JURISDICTION`, which the deploy sets from the site file, and makes its object ids on `.jurisdiction(env.JURISDICTION)`. The check fails on a `.jurisdiction(` call given a string written into the code. It cannot see whether every id that holds data goes through the site's value.
 - No promise is left unawaited. This is held by oxlint `typescript/no-floating-promises` in type-aware mode, plus strict TypeScript with `noUncheckedIndexedAccess`.
 - Each check that reads source text also runs on a sample it must flag.
 
@@ -92,7 +92,8 @@ Each site file is validated by a zod schema exported from `@c-f-x/kit`, `siteSch
 - `account_id`: the Cloudflare account, 32 lower-case hex characters;
 - `hostnames`: the tool's hostnames by role, at least one, for example `{ "admin": "status.example.com" }`;
 - `admin_emails`: who may sign in as an admin (section 8), at least one;
-- `alert_addresses`: who the tool's alerts and notices go to, at least one. Each must also be in the tool's `send_email` allowlist.
+- `alert_addresses`: who the tool's alerts and notices go to, at least one. Each must also be in the tool's `send_email` allowlist;
+- `jurisdiction`: where the installation keeps its data (section 5). Left out, Cloudflare places it; `"eu"` keeps it in the EU.
 
 A tool adds its own fields with `siteSchema.extend({...})`. `loadSiteFile(tool, schema, site)` reads `<tool>.jsonc` from the folder `site` names, the value of `CFX_SITE`, parses it as JSONC and checks it. It never throws. It answers the value, or the problems, each naming the file and the field that is wrong. The kit's test is `packages/kit/src/site.test.ts`. A wrong or missing value stops the deploy before any step runs. Nothing holds that yet: no tool's deploy loads its site file through the kit so far.
 
@@ -100,10 +101,11 @@ A tool adds its own fields with `siteSchema.extend({...})`. `loadSiteFile(tool, 
 - an account id or zone id, and any value shaped like a resource id (a UUID or 32 hex characters);
 - a real hostname in a URL, a route or a `vars` value, and any email address. Only `example.com` and the names under it are allowed;
 - a secret: a value under a key named like a credential (secret, token, password, API key, private key), or the name of any secret the tool lists in `tool:.dev.vars.example`. Wrangler's `secrets.required` list may name them, because it holds no values;
-- a D1 database or R2 bucket, in any block, without `"jurisdiction": "eu"`;
+- a key named `jurisdiction`, in any block. Where data is stored is the site file's value (section 5), which the deploy joins into the config it generates;
+- a block, the top level or any `env.<name>`, without a `secrets.required` list, or one that names other secrets than `tool:.dev.vars.example`. Wrangler checks the list on deploy: it is "A list of secret names that must be set to deploy your Worker" (developers.cloudflare.com/workers/wrangler/configuration/, read 2026-11-12). Its schema marks the field as not inherited from the top level, so every environment lists its own (`cloudflare/workers-sdk:packages/workers-utils/src/config/environment.ts`, read 2026-11-12). A Worker with no secrets lists `[]`;
 - a `.dev.vars` file that git does not ignore.
 
-A `vars` block is allowed, and its values are checked like every other value. A Durable Object's jurisdiction is set in code, so `c-f-x check architecture` holds it (section 2).
+A `vars` block is allowed, and its values are checked like every other value. A Durable Object's jurisdiction is set in code, so `c-f-x check architecture` holds that no literal one is written there (section 2). Nothing holds yet that a deploy joins the site's jurisdiction in: no tool's deploy loads its site file through the kit so far.
 
 ## 5. Data stores and their lifetimes
 
@@ -122,10 +124,12 @@ For example:
 | `Prober` | nothing | none | nothing |
 | `results` | one row per check run | 30 days | the daily sweep |
 
-Where data lives:
-- Per-project data that grows (errors, results) goes in a SQLite Durable Object in the `eu` jurisdiction, as in cfanalytics. Cloudflare's page says Workers "may still access Durable Objects constrained to a jurisdiction from anywhere in the world", and that the object id "will be logged outside of the specified jurisdiction for billing and debugging purposes" (developers.cloudflare.com/durable-objects/reference/data-location/).
-- Small shared registries (projects, keys, pages) and modest time series go in D1, created with `--jurisdiction=eu`. Cloudflare says "Jurisdictions can only be set on database creation and cannot be added or updated after the database exists" (developers.cloudflare.com/d1/configuration/data-location/, read 2026-11-11). So `install` must set the jurisdiction when it creates the database. The D1 size limit is 10 GB on Workers Paid (developers.cloudflare.com/d1/platform/limits/).
-- Blobs go in R2 in the `eu` jurisdiction. Each bucket also gets a lifecycle rule as a backstop. Cloudflare says objects "will typically be removed from a bucket within 24 hours" of expiry (developers.cloudflare.com/r2/buckets/object-lifecycles/).
+Where data is stored is a choice each installation makes once, in its site file's `jurisdiction` (section 4): left out, which is the default, Cloudflare places the data; `"eu"` keeps it in the EU. A tool may have users anywhere, so no tool fixes a region (owner, 2026-11-12, D-11). The public `wrangler.jsonc` names no jurisdiction. The deploy joins the site's value into each D1 and R2 binding of the config it generates, and into the var `JURISDICTION` that Durable Object code reads (section 2). Cloudflare says "Jurisdictions can only be set on database creation and cannot be added or updated after the database exists" (developers.cloudflare.com/d1/configuration/data-location/, read 2026-11-11). So `install` sets the jurisdiction when it creates each store, and a deployment keeps the jurisdiction it was created with: the owner's deployments made in the EU stay there, and their site files say `"eu"`.
+
+What goes where:
+- Per-project data that grows (errors, results) goes in a SQLite Durable Object, as in cfanalytics. Cloudflare's page says Workers "may still access Durable Objects constrained to a jurisdiction from anywhere in the world", and that the object id "will be logged outside of the specified jurisdiction for billing and debugging purposes" (developers.cloudflare.com/durable-objects/reference/data-location/).
+- Small shared registries (projects, keys, pages) and modest time series go in D1. The D1 size limit is 10 GB on Workers Paid (developers.cloudflare.com/d1/platform/limits/).
+- Blobs go in R2. Each bucket also gets a lifecycle rule as a backstop. Cloudflare says objects "will typically be removed from a bucket within 24 hours" of expiry (developers.cloudflare.com/r2/buckets/object-lifecycles/).
 
 Each tool runs one daily sweep, which logs `sweep_done` with counts per store.
 
@@ -184,15 +188,25 @@ Every tool runs on one Cloudflare account on Workers Paid. Cloudflare charges a 
 
 ## 11. Installing by someone else
 
-A person needs a Cloudflare account on Workers Paid and one zone.
+A person needs a Cloudflare account on Workers Paid and a domain on Cloudflare. A tool offers three ways to install, each written once:
+- **The agent route.** `npx skills add c-f-x/<tool>` adds the tool's skill (section 16, rule 2), and the person asks their agent to install the tool. The agent follows `tool:AGENTS.md`, "Install and set up".
+- **The install command**, `pnpm ops <tool> install`, with a site file written from `tool:site.example.jsonc`.
+- **By hand**: the numbered steps in `tool:AGENTS.md`, for when the command fails or does not exist yet.
 
-The quick path is Cloudflare's deploy button in each tool's README. Cloudflare "clones your source repository into the user's GitHub/GitLab account". It provisions the resources the Wrangler config asks for, including "KV namespaces, D1 databases, R2 buckets" and "Durable Objects" (developers.cloudflare.com/workers/platform/deploy-buttons/, read 2026-11-11). Worker secrets are named in `.dev.vars.example`. The page does not say whether the button can set a jurisdiction. Check that before a README offers the button. If it cannot, the README must say that data then sits wherever Cloudflare places it.
+The install command's contract, which every tool's `install` meets:
+- It runs through the kit's ops runner (section 3). Without `--go` it prints the plan and each step's undo, and changes nothing.
+- It creates each D1 database and R2 bucket in the site file's jurisdiction (section 5): with `--jurisdiction` when the site says `"eu"`, and without it when the site leaves it out.
+- It draws or asks for each secret and pipes it to Wrangler. Nothing secret reaches the screen.
+- It deploys, and ends with the health check of section 6.
+- `uninstall` lists everything it will delete, and needs `--go`.
 
-The maintained path is `pnpm ops <tool> install` with a site file written from `site.example.jsonc`. Its plan creates the stores in the `eu` jurisdiction, puts the secrets (drawn and piped, never printed), deploys and waits for health. `uninstall` lists everything it will delete and needs `--go`.
+**Check:** none yet. The kit holds only code that already runs in a tool (D-5), so `install` is born in the first tool that builds it, and its rules then move into the kit's runner. An install test runs `install`, `health` and `uninstall` against local Workers with a throwaway site file, and expects nothing to be left behind (section 12).
 
-**Checks:**
-- An install test runs `install`, `health` and `uninstall` against local Workers with a throwaway site file, and expects nothing to be left behind (section 12).
-- The fresh-clone check of section 1 proves that the button's build works.
+**Cloudflare's deploy button is not offered yet.** The button "clones your source repository into the user's GitHub/GitLab account" and provisions what the Wrangler config asks for, including "KV namespaces, D1 databases, R2 buckets" and "Durable Objects" (developers.cloudflare.com/workers/platform/deploy-buttons/, read 2026-11-11). Wrangler can now give an automatically provisioned D1 database a jurisdiction: the 4.159.0 release note says "Support jurisdiction when automatically provisioning D1 databases" (`cloudflare/workers-sdk`, release `wrangler@4.159.0`, checked by the lead on 2026-11-12). Nobody has shown that the button uses it. A README may offer the button once both hold:
+- a test on a scratch Cloudflare account shows that the button installs the tool and that it passes its health check;
+- the tool needs no site-file value that the button cannot set, such as its hostnames and admin addresses.
+
+Check: `c-f-x check layout` fails on a README that links `deploy.workers.cloudflare.com`. The change that offers the button removes that rule, with the scratch-account result in its description.
 
 ## 12. Tests
 
@@ -244,22 +258,33 @@ Check: only in part. Following a skill is a judgement no file shows. `c-f-x chec
 
 **2. Two agent guides, for two audiences.**
 - `AGENTS.md` is the brief for agents working on the repository, and its one home. `CLAUDE.md` holds exactly one line, `@AGENTS.md`, which Claude Code reads as an import.
-- `tool:skills/<repo>/SKILL.md` is for agents using the tool: how to connect a product, read its data and run it, and what needs the owner. Its frontmatter `name` is the folder's name and the repository's, and its `description` says when to use it. It holds no personal data, account ids or hostnames. Agents install it with `npx skills add c-f-x/<repo>`; that installer finds `skills/<name>/SKILL.md` in a repository (`vercel-labs/skills:docs/creating-skills.md`, "Skill Discovery", read 2026-11-11).
+- A tool's `AGENTS.md` has a section `## Install and set up`, which a person or an agent follows without asking. Its parts are these `###` headings, in this order: `What you need`, a table `| Need | How to check it |` with both cells filled in every row; `The install command` and what it prints (section 11); `What only the owner can do`, such as a sign-in or making an OAuth client; `Secrets`, where each secret of `secrets.required` is piped into `wrangler secret put`, so no value shows on screen; `Check that it works`, the request to `/healthz`; `Undo`; and `By hand`, a numbered list with every command.
+- `tool:skills/<repo>/SKILL.md` is for agents using the tool: how to connect a product, read its data and check it, and what needs the owner. It follows the Agent Skills format (agentskills.io/specification, read 2026-11-12): a frontmatter `name` equal to its folder, which is the repository's name; a `description` of at most 1024 characters that says when to use it; and a body under 500 lines. For installing, it links `https://github.com/c-f-x/<repo>/blob/master/AGENTS.md#install-and-set-up` instead of copying the steps. It holds no personal data, account ids or deployment hostnames. Agents install it with `npx skills add c-f-x/<repo>`; that installer finds `skills/<name>/SKILL.md` in a repository (`vercel-labs/skills:docs/creating-skills.md`, "Skill Discovery", read 2026-11-11).
 
-Check: `c-f-x check docs` fails, in every repository, on a missing `AGENTS.md`, one longer than 150 lines, and a `CLAUDE.md` that holds anything else. `layout` fails on a missing skill, a frontmatter `name` that is not the repository's, no `description`, an email address outside `c-f-x.com` and the example domains, and a 32-character hex id or a UUID. The repository's name is the `name` in its root `package.json`, which must be `cfx-<job>`. Nothing checks a skill for hostnames.
+Check: `c-f-x check docs` fails, in every repository, on a missing `AGENTS.md`, one longer than 150 lines, and a `CLAUDE.md` that holds anything else. `layout` fails on an install guide that is missing, lacks a part, has a part out of order or empty, has no needs table, does not pipe a required secret, shows no `/healthz` or has no numbered steps. It fails on a missing skill, a frontmatter `name` that is not the repository's, no `description` or one too long, a body too long, no link to the install guide, an email address outside `c-f-x.com` and the example domains, a 32-character hex id or a UUID, and a URL whose host is not an example domain, `c-f-x.com`, `github.com`, `npmjs.com` or under `cloudflare.com`. The repository's name is the `name` in its root `package.json`, which must be `cfx-<job>`. It cannot see whether the needs, the owner's steps or the manual steps are complete, or a hostname written without `https://`.
 
-The kit's skill is `skills/c-f-x/SKILL.md`, named for the `c-f-x` command it teaches, and installed with `npx skills add c-f-x/cfx-kit` once the repository is public.
+The kit's skill is `skills/c-f-x/SKILL.md`, named for the `c-f-x` command it teaches, and installed with `npx skills add c-f-x/cfx-kit`.
 
-**3. A professional install.** The README's `## Install` section shows three ways, in this order:
-- Cloudflare's deploy button (section 11), linking `https://deploy.workers.cloudflare.com/?url=https://github.com/c-f-x/<tool>`;
-- `pnpm ops <tool> install`, with its plan and the undo of each step (section 3);
-- `npx skills add c-f-x/<tool>`, for agents.
+**3. One README structure.** Every README has these parts, in this order (owner, 2026-11-12, D-12). The order follows standard-readme, which puts Install before Usage and the License last (github.com/RichardLitt/standard-readme/blob/main/spec.md, read 2026-11-12).
+- The title, `# <repository name>`.
+- One bold sentence, under 120 characters, with the same words as the repository's GitHub description.
+- Two or three sentences of intro, ending with the line that the tool is part of c-f-x, linked to `https://c-f-x.com`.
+- The screenshot: the tool's main screen with made-up data, light and dark through `<picture>`, with a `<source media="(prefers-color-scheme: dark)">` and an `<img>` whose alt text says what it shows. A tool without a screen shows real terminal output instead, in a `console` code block.
+- The shortest real example of a product using the tool, in a code block.
+- The sections `## What it does`, `## What it does not do`, `## Install`, `## Use`, `## How it works` (optional), `## Work on it`, `## Credits` (optional), `## Support` and `## License`, with no others and `## License` last.
+- No badges, apart from the sponsor badge of rule 6, and no table of contents.
 
-Check: `layout` fails unless all three appear, in that order, inside the section. It cannot see that the plan and undo are shown. The kit is a library, so its README shows the skill, the package and the commands to work on it.
+A tool's `## Install` gives, in this order: what you need and what it costs (Workers Paid, a domain on Cloudflare); the agent route, `npx skills add c-f-x/<tool>`, then asking the agent to install it; the install command, when the tool has one; and a link to `AGENTS.md#install-and-set-up` for every step. It offers no deploy button yet (section 11).
 
-**4. Public-repository files from day one.** `LICENSE` (MIT, D-6), `SECURITY.md` naming `security@c-f-x.com`, `.github/dependabot.yml` updating npm and github-actions, `docs/decisions.md`, and a README whose first line says what the tool is.
+Check: `layout` fails on a title that is not the repository's name, no bold line or one of 120 characters or more, an intro that does not end with the c-f-x link, no screenshot before the first section, a `<picture>` with no dark source, no alt text or an image file that does not exist, no code block between the screenshot and the first section, sections that are missing, renamed, added or out of order, a badge outside `## Support`, a list of links to the page's own headings, a link to the deploy button, and an Install section without its three anchors in order: "Workers Paid", the `npx skills add` line and the link to the install guide. A heading inside a code block is code, never a section. Nothing in a file holds the GitHub description, so `layout` cannot see that the bold line matches it; `gh repo view --json description` shows it. Whether the alt text describes the screen and the data is made up, a reviewer decides.
 
-Check: `layout` fails on each file that is missing, a `LICENSE` that does not begin `MIT License`, a `SECURITY.md` without the address, and a dependabot config without both ecosystems. Whether the README's first line says what the tool is, a reviewer decides.
+The kit is not a tool. Its README follows the same order, with terminal output for its screenshot and its own Install. `packages/kit/src/checks/readme.test.ts` holds that.
+
+A new tool starts from `templates/tool/`: its README, `AGENTS.md` with the install guide, `CLAUDE.md`, skill, `CONTRIBUTING.md`, `.dev.vars.example` and issue templates. Each uses the name `cfx-example`, which the tool replaces with its own. The layout test builds its clean sample from these files, so the templates pass `layout`, `docs` and `wrangler-config` (`packages/kit/src/checks/layout.test.ts`).
+
+**4. The files every tool keeps, from day one.** `README.md` (rule 3), `LICENSE` (MIT, D-6), `SECURITY.md` naming `security@c-f-x.com`, `AGENTS.md` and `CLAUDE.md` (rule 2), `CONTRIBUTING.md`, `.github/dependabot.yml` updating npm and github-actions, `.github/FUNDING.yml` (rule 6), at least one issue template in `tool:.github/ISSUE_TEMPLATE/`, `.dev.vars.example` naming exactly the secrets of `wrangler.jsonc`'s `secrets.required` (section 4), `site.example.jsonc` with `example.com` values (section 4), and `docs/decisions.md`. Not required, because for a project with one maintainer they are ceremony: `CODE_OF_CONDUCT.md`, `SUPPORT.md` (the README's `## Support` is that), and a pull request template.
+
+Check: `layout` fails on each file that is missing, a `LICENSE` that does not begin `MIT License`, a `SECURITY.md` without the address, a dependabot config without both ecosystems, and an issue-template folder that holds only `config.yml`. `docs` holds `AGENTS.md` and `CLAUDE.md`, and `wrangler-config` holds `secrets.required` against `.dev.vars.example`.
 
 **5. The garden's tools, adopted and dogfooded.** plotplot's answer of 2026-11-11 says which of the owner's tools apply to a c-f-x repository.
 - **weeder**, in every repository. Run `weeder guard install --protect master` in each clone. Add a CI job that installs weeder from its pinned release and runs `weeder check --base origin/master --strict` on each pull request, as `jahala/weeder:examples/ci/github.yml` does. weeder's guard refuses to install where husky owns the hooks, so a repository uses no husky. While a repository is private, the job writes its findings as text (`--format table`, because weeder writes SARIF whenever its output is not a terminal) and fails when weeder blocks (exit 2) or cannot judge (exit 3). When it goes public, the job writes SARIF and uploads it to code scanning: GitHub says code scanning is "enabled for public repositories by default", and a private repository needs a paid GitHub Code Security product (docs.github.com/en/get-started/learning-about-github/about-github-advanced-security, read 2026-11-11). Check: `layout` fails without a workflow that runs `weeder check --base origin/master`, and on a `.husky/` folder. Nothing in a repository can see whether a clone installed the guard; `weeder guard status` says so per clone.

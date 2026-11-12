@@ -42,6 +42,14 @@ export const siteSchema = z.strictObject({
   admin_emails: addresses,
   /** Who the tool's alerts and notices go to. Each must be in its send_email binding's allowlist. */
   alert_addresses: addresses,
+  /**
+   * Where this installation keeps its data: left out for Cloudflare's default
+   * placement, or `"eu"`. Chosen once: Cloudflare cannot change a store's
+   * jurisdiction after it is made (conventions, section 5).
+   */
+  jurisdiction: z
+    .literal("eu", { error: 'leave it out for Cloudflare\'s default placement, or say "eu"' })
+    .optional(),
 });
 
 /** What every site file holds. */

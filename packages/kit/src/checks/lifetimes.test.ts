@@ -117,7 +117,7 @@ test("the lifetimes check flags a store without a row and a row without a store"
 
 const WRANGLER = `{
   "name": "cfx-sample",
-  "d1_databases": [{ "binding": "DB", "jurisdiction": "eu" }],
+  "d1_databases": [{ "binding": "DB" }],
   "kv_namespaces": [{ "binding": "CACHE" }],
   "durable_objects": {
     "bindings": [
@@ -126,7 +126,7 @@ const WRANGLER = `{
       { "name": "OTHER", "class_name": "Other", "script_name": "cfx-other" }
     ]
   },
-  "env": { "demo": { "r2_buckets": [{ "binding": "BLOBS", "jurisdiction": "eu" }] } }
+  "env": { "demo": { "r2_buckets": [{ "binding": "BLOBS" }] } }
 }`;
 
 const SAMPLE = {

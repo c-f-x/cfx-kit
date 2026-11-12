@@ -2,7 +2,7 @@
 
 The shared repository of c-f-x, a family of self-hosted tools that run on Cloudflare. Each tool lives in its own repository and is named `cfx-<job>` (D-1, D-2). This repository releases `@c-f-x/kit`: the `c-f-x` command, which runs the rule checks every tool repository shares, and the code those tools have in common. The licence is MIT (D-6). Each version is a tarball attached to the GitHub release for its tag, and tools install it from that URL (D-10). It is not on npm: that publish needs the owner's npm sign-in.
 
-**State (2026-11-11):** foundations, the ops runner, the guards for tool repositories, the runtime helpers and the ground rules every repository meets (D-8, `docs/conventions.md` section 16). The command has eight checks and one writing command, listed below. The package exports the run-scope library, the ops runner and the site-file schema. Its entry `@c-f-x/kit/worker` exports what a tool's Worker runs: the health handler and its contract test, `job`, `notify` and the key helpers. The first consumer of all of it is cfx-status.
+**State (2026-11-11):** foundations, the ops runner, the guards for tool repositories, the runtime helpers and the ground rules every repository meets (D-8, `docs/conventions.md` section 16), and since 2026-11-12 the repository standard with its templates (D-12) and the site's choice of where data is stored (D-11). The command has eight checks and one writing command, listed below. The package exports the run-scope library, the ops runner and the site-file schema. Its entry `@c-f-x/kit/worker` exports what a tool's Worker runs: the health handler and its contract test, `job`, `notify` and the key helpers. The first consumer of all of it is cfx-status.
 
 ## Start here
 
@@ -20,8 +20,9 @@ The shared repository of c-f-x, a family of self-hosted tools that run on Cloudf
 | Path | Holds |
 |---|---|
 | `packages/kit/src/cli.ts` | The `c-f-x` command |
-| `packages/kit/src/checks/` | One file per check, with its test. `packages/kit/src/checks/index.ts` lists them. `source.ts` reads source text and `tool-config.ts` reads a tool's `c-f-x.json` and `wrangler.jsonc`. `ground-rules.ts` holds the rules of section 16 that `layout` runs. `research-names.ts` is generated: never edit it by hand. |
-| `packages/kit/src/test-support/` | Test helpers: run the command, write sample repositories, make a sample a git repository |
+| `packages/kit/src/checks/` | One file per check, with its test. `packages/kit/src/checks/index.ts` lists them. `source.ts` reads source text and `tool-config.ts` reads a tool's `c-f-x.json` and `wrangler.jsonc`. `ground-rules.ts` holds the rules of section 16 that `layout` runs, `readme.ts` the README's order and `markdown.ts` the Markdown reading they share. `research-names.ts` is generated: never edit it by hand. |
+| `packages/kit/src/test-support/` | Test helpers: run the command, write sample repositories, make a sample a git repository. The clean tool sample is built from `templates/tool/`. |
+| `templates/tool/` | The files a new tool copies: README, `AGENTS.md` with the install guide, skill, contributing guide, `.dev.vars.example` and issue templates (`docs/conventions.md`, section 16, rule 3) |
 | `packages/kit/src/run-scope.ts` | The run-scope library: a folder per run, and the sweep of dead runs |
 | `packages/kit/src/ops/` | The ops runner (`docs/conventions.md`, section 3): the step runner, operations with a plan and an undo per step, the deploy preconditions, and the bundle and health steps a deploy composes |
 | `packages/kit/src/site.ts` | The site-file schema and loader (`docs/conventions.md`, section 4) |
@@ -71,12 +72,12 @@ A tool runs these from its own folder, with `docs` and `run-scope` above. Each r
 
 | Command | Holds (conventions section) |
 |---|---|
-| `c-f-x check architecture` | `core/` is pure, slices meet through `index.ts`, no module state, one `mail.ts`, scheduled work only through `job`, Durable Objects in the eu (2, 5, 6, 9) |
-| `c-f-x check layout` | The files every tool keeps, a test that runs the health contract, and the ground rules (1, 6, 16) |
+| `c-f-x check architecture` | `core/` is pure, slices meet through `index.ts`, no module state, one `mail.ts`, scheduled work only through `job`, no jurisdiction written into the code (2, 5, 6, 9) |
+| `c-f-x check layout` | The files every tool keeps, a test that runs the health contract, and the ground rules: the README's order, the install guide, the skill (1, 6, 11, 16) |
 | `c-f-x check names` | No research-only vendor names in tracked files (14). The kit runs it on itself too. |
 | `c-f-x check lifetimes` | Every binding and table has a lifetimes row (5) |
 | `c-f-x check migrations` | No applied schema step changes (5). `c-f-x lock-migrations` locks new steps. |
-| `c-f-x check wrangler-config` | No ids, real hostnames, email addresses or secrets in `wrangler.jsonc`, and D1 and R2 in the eu (4) |
+| `c-f-x check wrangler-config` | No ids, real hostnames, email addresses, secrets or jurisdiction in `wrangler.jsonc`, and `secrets.required` as `.dev.vars.example` lists them (4, 5) |
 
 Each check's test builds a sample tool repository it must flag and one it must pass, inside the test's run scope.
 
@@ -88,9 +89,9 @@ Measured on the owner's Mac on 2026-11-11, with a load average near 9 to 13 from
 |---|---|---|
 | `pnpm lint` | oxlint (type-aware) and Biome. tend's renderer, `docs/tend/loop.js`, is left out: tend writes it. | about 3.5 s |
 | `pnpm typecheck` | `tsc` on the kit, once with Node's types and once on the Worker code and its tests with the Workers types, and the scripts with `checkJs` | about 1.5 s |
-| `pnpm test` | The kit's tests: first `node --test`, then Vitest for the Worker helpers inside workerd (`packages/kit/test/`). The check tests run the command on sample repositories, which is most of the time. | about 5 to 6.5 s. The runners report 146 tests in 3.5 s for `node --test` and 21 in 0.4 s for Vitest (2026-11-12). The slowest file, `release.test.ts`, takes about 1.5 s: it builds, packs and installs the kit. |
+| `pnpm test` | The kit's tests: first `node --test`, then Vitest for the Worker helpers inside workerd (`packages/kit/test/`). The check tests run the command on sample repositories, which is most of the time. | about 5 to 6.5 s. The runners report 182 tests in 4.1 s for `node --test` and 21 in 0.4 s for Vitest (2026-11-12). The slowest file, `release.test.ts`, takes about 1.5 s: it builds, packs and installs the kit. |
 | `pnpm build` | `tsc` builds the kit | about 0.8 s |
-| `pnpm check` | Lint, typecheck, test and build in order, then the built command's docs, names and run-scope checks on this repository, stopping at the first failure. It removes the build when it made it. | about 10 to 18 s; 17.7 s on 2026-11-12, at a load average near 9 |
+| `pnpm check` | Lint, typecheck, test and build in order, then the built command's docs, names and run-scope checks on this repository, stopping at the first failure. It removes the build when it made it. | about 10 to 18 s; 12.1 s and 17.7 s on 2026-11-12, at load averages near 6 and 9 |
 
 When each runs:
 - **Every pull request:** `pnpm check`, locally before pushing and in CI on the pull request's merge result. The suite takes seconds, so it always runs whole. The first pull request's CI took 51 s from opening to verdict: 9 s queued, then 42 s on the runner, of which `pnpm check` took 7 s and the setup and install the rest (2026-11-11).
