@@ -1,6 +1,6 @@
 {
   "name": "@c-f-x/kit",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "license": "MIT",
   "private": true,
   "description": "Shared code and rule checks for the c-f-x tools.",

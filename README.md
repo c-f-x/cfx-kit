@@ -70,7 +70,7 @@ npx skills add c-f-x/cfx-kit
 For a tool, from the tarball the kit's release for that version carries:
 
 ```bash
-pnpm add -D https://github.com/c-f-x/cfx-kit/releases/download/v0.2.0/c-f-x-kit-0.2.0.tgz
+pnpm add -D https://github.com/c-f-x/cfx-kit/releases/download/v0.3.0/c-f-x-kit-0.3.0.tgz
 ```
 
 The URL pins the version. A later version is the same line with its number in both places.
