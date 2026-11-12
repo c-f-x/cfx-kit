@@ -93,3 +93,13 @@ The decision log of the c-f-x family. One entry per decision. A decision is neve
 **Decision.** Every tool is named `cfx-<job>`: cfx-status, cfx-mail, cfx-analytics. This repository is `c-f-x/cfx-kit`. The brand, the org, the npm scope (`@c-f-x/kit`, `@c-f-x/ui`) and the domain stay c-f-x, as D-1 set. Key prefixes (`cfs_sk_` and the like) are unchanged.
 
 **Consequences.** This supersedes D-1's tool-name rule; the rest of D-1 stands. The repositories were renamed on GitHub, which redirects the old URLs. The CI runner is labelled after the new name. Entries above keep their original words.
+
+## D-10 · Kit versions ship as GitHub release tarballs, not on npm yet · accepted (2026-11-12)
+
+**Made by.** The lead.
+
+**Context.** cfx-mail and cfx-analytics need `@c-f-x/kit` to run `c-f-x check` and use the kit's code. npm needs the owner's sign-in (D-6). A git dependency does not work: tested on 2026-11-11, `pnpm add github:c-f-x/cfx-kit#<sha>&path:/packages/kit` installs `package.json` and no `dist`, because `dist` is built, never committed, so the `c-f-x` command crashes.
+
+**Decision.** For each tag `v<version>`, CI checks that the tag equals the kit's version, runs `pnpm check`, builds the kit, packs it, and attaches the tarball to the tag's GitHub release (`.github/workflows/release.yml`). A tool installs it with `pnpm add -D https://github.com/c-f-x/cfx-kit/releases/download/v<version>/c-f-x-kit-<version>.tgz`. The package keeps `"private": true`.
+
+**Consequences.** This changes how D-2's packages reach the tools; D-2's rest stands. The URL pins the version, so a tool moves to a new one by changing its install line. `packages/kit/src/release.test.ts` packs the kit the same way, installs it into a sample tool and runs its command, and fails when `README.md` or the skill shows another version's line. Publishing to npm stays the owner's step, for when a tool needs it.
