@@ -123,3 +123,14 @@ The decision log of the c-f-x family. One entry per decision. A decision is neve
 **Decision.** Every tool's README follows one order, with a bold line, a short intro, a screenshot and the shortest example at the top. Its `AGENTS.md` holds `## Install and set up` with fixed parts. Its skill follows the Agent Skills format and links the install guide. Every tool keeps the same files, and its `wrangler.jsonc` lists its secrets in `secrets.required`, as `.dev.vars.example` does. The install command has one contract. The deploy button waits until a scratch-account test passes and the tool needs no site values the button cannot set. `docs/conventions.md` section 11 and section 16 rules 2 to 4 say so, and `templates/tool/` holds the files a new tool copies.
 
 **Consequences.** `c-f-x check layout` holds the README, the install guide, the skill and the files, and `c-f-x check wrangler-config` holds `secrets.required`. Section 16's former rule 3, three ways to install with the deploy button first, is replaced. cfx-analytics and cfx-mail do not meet the standard yet; the lead files the work in their repositories.
+
+## D-13 · A tool's product page lives at c-f-x.com/<tool>/, not on GitHub Pages · accepted (2026-11-13)
+
+**Made by.** The owner: "we now want c-f-x.com/<tool-name> --- not github pages".
+
+**Context.** D-8 gave every tool a landing page on GitHub Pages, from its repository's `/docs` folder, and `c-f-x check layout` required `docs/index.html` and `docs/.nojekyll`. plotplot.ai, the model, has since moved its tools' pages onto its own domain, at `plotplot.ai/<tool>/`.
+
+**Decision.** Each released tool's page is `c-f-x.com/<tool>/`, in the `c-f-x/c-f-x.com` repository, following `c-f-x.com:docs/product-pages.md` and sharing the site's styles. A tool repository holds no page, and the layout check no longer asks for one.
+
+**Consequences.** One site, one look and one deploy for every page. The link rule (a tool's own site once it has one) now points at `c-f-x.com/<tool>/`. This replaces D-8's landing-page clause; the rest of D-8 stands.
+

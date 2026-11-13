@@ -129,9 +129,10 @@ test("c-f-x check layout fails on a sample that lacks the tool files", async () 
   assert.match(stderr, /no workflow in \.github\/workflows runs `petals check` or `petals gate`/);
   assert.match(stderr, /docs\/tend\/ holds no \*\.tend\.html map/);
   assert.match(stderr, /\.petalsrc is missing/);
-  assert.match(stderr, /docs\/index\.html is missing/);
-  assert.match(stderr, /docs\/\.nojekyll is missing/);
-  assert.match(stderr, /check layout: failed with 20 problems/);
+  // A tool's product page lives at c-f-x.com/<tool>/, not in its repository (D-13).
+  assert.doesNotMatch(stderr, /docs\/index\.html/);
+  assert.doesNotMatch(stderr, /nojekyll/);
+  assert.match(stderr, /check layout: failed with 18 problems/);
 });
 
 test("c-f-x check layout reads the ground rules from the disk: a README in no shape of the standard", async () => {

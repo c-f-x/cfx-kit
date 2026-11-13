@@ -35,7 +35,7 @@ export function groundFiles(name: string): Record<string, string> {
     "    # On a self-hosted runner, the temp folder is the job's own.",
     `    runs-on: \${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "macOS", "${name}"]') }}`,
     "    steps:",
-    "      - run: petals check docs/index.html",
+    "      - run: petals check apps/web/index.html",
     "  weeder:",
     "    steps:",
     "      - run: weeder check --base origin/master --strict",
@@ -76,8 +76,6 @@ export function groundFiles(name: string): Record<string, string> {
     ".github/workflows/ci.yml": CI,
     "docs/decisions.md": "# Decisions\n",
     [`docs/tend/${name}.tend.html`]: "<!doctype html>\n",
-    "docs/index.html": "<!doctype html>\n",
-    "docs/.nojekyll": "",
     ".petalsrc": `brand:\n  product: ${name}\n`,
     ".gitignore": ".dev.vars\nwrangler.deploy.jsonc\n",
   };
