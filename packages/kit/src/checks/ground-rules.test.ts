@@ -369,20 +369,23 @@ const BREAKS: [string, Record<string, string>, string][] = [
     without(".petalsrc"),
     ".petalsrc is missing: it names the family brand and the tool's layer",
   ],
-  [
-    "no landing page",
-    without("docs/index.html"),
-    "docs/index.html is missing: it is the landing page GitHub Pages publishes from /docs",
-  ],
-  [
-    "no .nojekyll",
-    without("docs/.nojekyll"),
-    "docs/.nojekyll is missing: without it, GitHub Pages runs Jekyll over every doc in /docs",
-  ],
 ];
 
 test("the ground rules pass a tool repository that keeps every one", () => {
   assert.deepEqual(groundRuleViolations(view(CLEAN), "."), []);
+});
+
+// D-13: a tool's product page lives at c-f-x.com/<tool>/, so the ground rules ask
+// no page of a tool repository, and an old page left in one is no problem either.
+test("the ground rules ask no product page of a tool repository", () => {
+  assert.equal(CLEAN["docs/index.html"], undefined);
+  assert.equal(CLEAN["docs/.nojekyll"], undefined);
+  assert.deepEqual(groundRuleViolations(view(CLEAN), "."), []);
+});
+
+test("the ground rules let an old GitHub Pages page stay in a tool repository", () => {
+  const withOldPage = { ...CLEAN, "docs/index.html": "<!doctype html>\n", "docs/.nojekyll": "" };
+  assert.deepEqual(groundRuleViolations(view(withOldPage), "."), []);
 });
 
 for (const [name, files, problem] of BREAKS) {

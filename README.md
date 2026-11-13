@@ -10,11 +10,10 @@ docs/data-model.md is missing
 docs/contract.md is missing
 docs/spec/behaviours.md is missing
 no test runs the health contract: a *.test.ts file must import checkHealthContract from @c-f-x/kit/worker and call it
-skills/cfx-status/SKILL.md is missing: it is the skill agents install with `npx skills add c-f-x/cfx-status`
-README.md: the line after the title must be one bold sentence, **like this**, the same words as the GitHub description
 ...
-docs/.nojekyll is missing: without it, GitHub Pages runs Jekyll over every doc in /docs
-check layout: failed with 25 problems
+docs/tend/ holds no *.tend.html map: run `tend init`
+.petalsrc is missing: it names the family brand and the tool's layer
+check layout: failed with 18 problems
 ```
 
 Every problem names the file and the rule. A tool's Worker answers its health check with the kit's handler:

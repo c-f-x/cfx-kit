@@ -35,7 +35,6 @@ const TOOL_NAME = /^cfx-[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SECURITY_ADDRESS = "security@c-f-x.com";
 const WORKFLOWS = ".github/workflows";
 const ISSUE_TEMPLATES = ".github/ISSUE_TEMPLATE";
-const LANDING_PAGE = "docs/index.html";
 
 function toolName(view: RepoView): string | undefined {
   const text = view.read("package.json");
@@ -271,13 +270,5 @@ export function groundRuleViolations(view: RepoView, worker: string): string[] {
     problems.push("docs/tend/ holds no *.tend.html map: run `tend init`");
   if (view.read(".petalsrc") === undefined)
     problems.push(".petalsrc is missing: it names the family brand and the tool's layer");
-  if (view.read(LANDING_PAGE) === undefined)
-    problems.push(
-      `${LANDING_PAGE} is missing: it is the landing page GitHub Pages publishes from /docs`,
-    );
-  if (view.read("docs/.nojekyll") === undefined)
-    problems.push(
-      "docs/.nojekyll is missing: without it, GitHub Pages runs Jekyll over every doc in /docs",
-    );
   return problems;
 }
