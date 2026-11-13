@@ -30,11 +30,11 @@
     "test": "node --test \"src/**/*.test.ts\" && vitest run"
   },
   "devDependencies": {
-    "@cloudflare/vitest-plugin": "1.4.5",
-    "@cloudflare/workers-types": "5.20261019.1",
-    "@types/node": "26.6.5",
+    "@cloudflare/vitest-plugin": "1.6.0",
+    "@cloudflare/workers-types": "5.20261108.1",
+    "@types/node": "26.6.6",
     "typescript": "7.0.2",
-    "vitest": "5.0.5"
+    "vitest": "5.1.0"
   },
   "dependencies": {
     "jsonc-parser": "3.3.1",
