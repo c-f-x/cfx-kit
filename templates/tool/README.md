@@ -35,9 +35,12 @@ The easy way is to let your coding agent do it. Add this tool's skill, then ask 
 npx skills add c-f-x/cfx-example
 ```
 
-Or run the install command yourself. It prints its plan and how to undo each step, and changes nothing until you add `--go`:
+Or get the code and run the install command yourself. It prints its plan and how to undo each step, and changes nothing until you add `--go`:
 
 ```bash
+git clone https://github.com/c-f-x/cfx-example
+cd cfx-example
+pnpm install
 pnpm ops cfx-example install
 ```
 
