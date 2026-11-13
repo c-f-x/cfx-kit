@@ -10,7 +10,7 @@ description: Use when working in a c-f-x tool repository (a cfx-<job> tool on Cl
 The package is not on npm. Each version is a tarball attached to the kit's GitHub release for that version. A tool installs it as a dev dependency from that URL, which pins the version:
 
 ```
-pnpm add -D https://github.com/c-f-x/cfx-kit/releases/download/v0.4.0/c-f-x-kit-0.4.0.tgz
+pnpm add -D https://github.com/c-f-x/cfx-kit/releases/download/v0.5.0/c-f-x-kit-0.5.0.tgz
 ```
 
 To move to a later version, run the same line with the new number in both places. Then run `pnpm exec c-f-x check <name>`.
