@@ -33,7 +33,7 @@ const edited = (p: string, from: string, to: string) => {
   return withFile(p, text.replace(from, to));
 };
 
-const INSTALL = `README.md: its ## Install section must give, in this order, what you need (the Workers Paid plan), the agent route (\`npx skills add c-f-x/${NAME}\`) and the link to every step (AGENTS.md#install-and-set-up)`;
+const INSTALL = `README.md: its ## Install section must give, in this order, what you need (the Workers Paid plan), the agent route (\`npx skills add c-f-x/${NAME}\`), getting the code (\`git clone https://github.com/c-f-x/${NAME}\`) and the link to every step (AGENTS.md#install-and-set-up)`;
 const SECTIONS = (found: string) =>
   `README.md: its sections must be ## What it does, ## What it does not do, ## Install, ## Use, ## How it works (if any), ## Work on it, ## Credits (if any), ## Support and ## License, in that order; it has ${found}`;
 const PARTS = (found: string) =>
@@ -215,6 +215,11 @@ const BREAKS: [string, Record<string, string>, string][] = [
   [
     "no agent route",
     edited("README.md", `npx skills add c-f-x/${NAME}`, "npx skills add"),
+    INSTALL,
+  ],
+  [
+    "no line to get the code",
+    edited("README.md", `git clone https://github.com/c-f-x/${NAME}`, "git clone <the repository>"),
     INSTALL,
   ],
   [

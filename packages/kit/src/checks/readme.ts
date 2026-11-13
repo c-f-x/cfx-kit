@@ -175,11 +175,16 @@ export function readmeViolations(
   // A README without its Install section breaks the section order, which says so.
   const install = section(text, "Install");
   if (install !== undefined) {
-    const parts = ["Workers Paid", `npx skills add c-f-x/${name}`, `](${AGENTS_INSTALL})`];
+    const parts = [
+      "Workers Paid",
+      `npx skills add c-f-x/${name}`,
+      `git clone https://github.com/c-f-x/${name}`,
+      `](${AGENTS_INSTALL})`,
+    ];
     const at = parts.map((part) => install.indexOf(part));
     if (!at.every((i, n) => i !== -1 && (n === 0 || i > (at[n - 1] ?? -1))))
       problems.push(
-        `${README}: its ## Install section must give, in this order, what you need (the Workers Paid plan), the agent route (\`npx skills add c-f-x/${name}\`) and the link to every step (${AGENTS_INSTALL})`,
+        `${README}: its ## Install section must give, in this order, what you need (the Workers Paid plan), the agent route (\`npx skills add c-f-x/${name}\`), getting the code (\`git clone https://github.com/c-f-x/${name}\`) and the link to every step (${AGENTS_INSTALL})`,
       );
   }
   if (!(section(text, "Support") ?? "").includes(`](${SPONSOR})`))
