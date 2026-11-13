@@ -85,6 +85,10 @@ From `@c-f-x/kit/worker`, which a Worker can bundle:
 
 The public repository holds no account id, hostname or email address. Those live in a private site folder named by `CFX_SITE`, one `<tool>.jsonc` per tool, checked by `loadSiteFile(tool, siteSchema.extend({...}), process.env.CFX_SITE)`. It answers the value or the problems, never a throw. Write a `site.example.jsonc` with `example.com` values for other people. The site file's optional `jurisdiction` says where the installation keeps its data: left out for Cloudflare's placement, or `"eu"`. Never write a jurisdiction into `wrangler.jsonc` or the code: the deploy joins the site's value into the generated config, and Durable Object code reads it from the var `JURISDICTION`.
 
+## The tool's product page
+
+When a tool is released, it gets a page at `c-f-x.com/<tool>/` (D-13). The page lives in the `c-f-x/c-f-x.com` repository, not in the tool's. Follow [its guide](https://github.com/c-f-x/c-f-x.com/blob/master/docs/product-pages.md) from start to deploy: it copies [the template](https://github.com/c-f-x/c-f-x.com/blob/master/templates/product-page.html), takes every fact from the tool's README and specs, and shows the page to the owner before it ships. cfx-analytics' and cfx-mail's pages are the finished examples.
+
 ## What needs the owner
 
 - Deploying to the owner's account, putting secrets and running `uninstall` with `--go`.
